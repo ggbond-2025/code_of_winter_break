@@ -72,8 +72,13 @@ public class AuthServiceImpl implements AuthService {
     public void changePassword(Long userId, String oldPassword, String newPassword) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("用户不存在"));
-        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
-            throw new IllegalArgumentException("原密码错误");
+        if (!user.isFirstLogin()) {
+            if (oldPassword == null || oldPassword.isBlank()) {
+                throw new IllegalArgumentException("原密码不能为空");
+            }
+            if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+                throw new IllegalArgumentException("原密码错误");
+            }
         }
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setFirstLogin(false);
