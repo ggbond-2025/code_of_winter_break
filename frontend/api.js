@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:8080';
+const API_BASE = 'http://a6da8e29.natappfree.cc';
 
 const Auth = {
   getToken()    { return localStorage.getItem('lf_token') || ''; },
