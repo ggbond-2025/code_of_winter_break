@@ -32,4 +32,14 @@ public interface SuperAdminService {
     void deleteAnnouncement(Long announcementId);
 
     Map<String, Object> globalStats();
+
+    Map<String, Object> latestBackupInfo();
+
+    Map<String, Object> backupNow();
+
+    Map<String, Object> exportDataSql(Integer rangeMonths, List<String> types);
+
+    Map<String, Object> previewExpiredCleanup(Integer days);
+
+    Map<String, Object> cleanupExpiredData(Integer days);
 }

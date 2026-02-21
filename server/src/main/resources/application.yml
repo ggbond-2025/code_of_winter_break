@@ -26,6 +26,9 @@ spring:
 file:
   upload-dir: uploads
 
+backup:
+  output-dir: backups/sql
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html

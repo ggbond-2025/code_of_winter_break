@@ -859,21 +859,175 @@ Router.register('superMessages', function (app) {
 });
 
 Router.register('superChat', function (app) {
-  Router.go('myChat');
+  Router.go('superHome');
 });
 
 Router.register('superBackup', function (app) {
   const main = renderLayout(app, 'SUPER_ADMIN', 'superBackup');
   main.innerHTML = `
-    <div style="padding:40px;text-align:center">
-      <h2 style="margin-bottom:30px">数据备份</h2>
-      <p style="margin-bottom:20px">点击下方按钮备份全校失物招领系统数据</p>
-      <button class="btn-primary" id="backupBtn" style="padding:14px 60px;font-size:16px">数据备份</button>
-      <p id="backupMsg" class="msg" style="margin-top:16px"></p>
+    <div style="padding:26px 30px">
+      <h2 style="margin:0 0 18px 0">数据管理</h2>
+      <div style="border:1px solid #bbb;background:#f5f5f5;padding:26px 30px;min-height:170px">
+        <button class="btn-outline" id="backupBtn" style="min-width:130px">立即备份</button>
+        <div style="margin-top:56px;font-size:34px;line-height:1.2;font-weight:bold">
+          最近一次备份时间：<span id="lastBackupTime">加载中...</span>
+        </div>
+        <p id="backupMsg" class="msg" style="margin-top:14px"></p>
+      </div>
+
+      <div style="border:1px solid #bbb;background:#f5f5f5;padding:26px 30px;min-height:190px;margin-top:22px">
+        <button class="btn-outline" id="exportBtn" style="min-width:130px">导出数据</button>
+        <div style="margin-top:24px;display:flex;flex-direction:column;gap:16px;max-width:760px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <b style="font-size:30px;transform:scale(0.5);transform-origin:left center;white-space:nowrap">导出时间范围：</b>
+            <select id="exportRange" style="height:34px;min-width:170px;padding:0 10px;border:1px solid #bbb;border-radius:3px;background:#fff">
+              <option value="1">1个月</option>
+              <option value="2">2个月</option>
+              <option value="4">4个月</option>
+              <option value="8">8个月</option>
+              <option value="12">1年</option>
+            </select>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:10px">
+            <b style="font-size:30px;transform:scale(0.5);transform-origin:left top;white-space:nowrap;margin-top:2px">导出数据类型：</b>
+            <div style="display:flex;flex-wrap:wrap;gap:12px 18px;padding-top:4px">
+              <label><input type="checkbox" value="FOUND" checked /> 导出失物招领</label>
+              <label><input type="checkbox" value="LOST" /> 寻物启事</label>
+              <label><input type="checkbox" value="GLOBAL_ANNOUNCEMENT" /> 全局公告</label>
+              <label><input type="checkbox" value="REGION_ANNOUNCEMENT" /> 地区公告</label>
+            </div>
+          </div>
+        </div>
+        <p id="exportMsg" class="msg" style="margin-top:14px"></p>
+      </div>
+
+      <div style="border:1px solid #bbb;background:#f5f5f5;padding:26px 30px;min-height:145px;margin-top:22px">
+        <button class="btn-outline" id="cleanupBtn" style="min-width:130px">删除过期数据</button>
+        <div style="margin-top:20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <b style="font-size:30px;transform:scale(0.5);transform-origin:left center;white-space:nowrap">清理时间：已归档、已删除、已认领后</b>
+          <input id="cleanupDays" type="number" min="1" value="7" style="width:70px;height:30px;padding:0 8px;border:1px solid #bbb;border-radius:3px" />
+          <b style="font-size:30px;transform:scale(0.5);transform-origin:left center;white-space:nowrap">天</b>
+        </div>
+        <div style="margin-top:8px;display:flex;align-items:center;gap:8px">
+          <b style="font-size:30px;transform:scale(0.5);transform-origin:left center;white-space:nowrap">清理条数：</b>
+          <span id="cleanupCount" style="font-weight:bold">0条</span>
+        </div>
+        <p id="cleanupMsg" class="msg" style="margin-top:10px"></p>
+      </div>
     </div>
   `;
-  document.getElementById('backupBtn').onclick = () => {
-    document.getElementById('backupMsg').textContent = '数据备份功能开发中...';
-    document.getElementById('backupMsg').className = 'msg msg-err';
+
+  const backupBtn = document.getElementById('backupBtn');
+  const backupMsg = document.getElementById('backupMsg');
+  const lastBackupTime = document.getElementById('lastBackupTime');
+  const exportBtn = document.getElementById('exportBtn');
+  const exportMsg = document.getElementById('exportMsg');
+  const exportRange = document.getElementById('exportRange');
+  const cleanupBtn = document.getElementById('cleanupBtn');
+  const cleanupDays = document.getElementById('cleanupDays');
+  const cleanupCount = document.getElementById('cleanupCount');
+  const cleanupMsg = document.getElementById('cleanupMsg');
+
+  async function loadLatestBackup() {
+    try {
+      const res = await api('/api/super/backup/latest');
+      const data = res.data || {};
+      lastBackupTime.textContent = data.backupTime || '暂无';
+    } catch (e) {
+      lastBackupTime.textContent = '读取失败';
+      backupMsg.textContent = e.message;
+      backupMsg.className = 'msg msg-err';
+    }
+  }
+
+  backupBtn.onclick = async () => {
+    backupBtn.disabled = true;
+    backupMsg.textContent = '正在备份，请稍候...';
+    backupMsg.className = 'msg';
+    try {
+      const res = await api('/api/super/backup/now', { method: 'POST' });
+      const data = res.data || {};
+      lastBackupTime.textContent = data.backupTime || '刚刚';
+      backupMsg.textContent = `备份成功，共导出${data.tableCount || 0}张表，目录：${data.backupFolder || '-'}`;
+      backupMsg.className = 'msg msg-ok';
+    } catch (e) {
+      backupMsg.textContent = e.message;
+      backupMsg.className = 'msg msg-err';
+    } finally {
+      backupBtn.disabled = false;
+    }
   };
+
+  exportBtn.onclick = async () => {
+    const selectedTypes = Array.from(main.querySelectorAll('input[type="checkbox"]:checked')).map(i => i.value);
+    if (selectedTypes.length === 0) {
+      exportMsg.textContent = '请至少选择一种导出数据类型';
+      exportMsg.className = 'msg msg-err';
+      return;
+    }
+    exportBtn.disabled = true;
+    exportMsg.textContent = '正在导出，请稍候...';
+    exportMsg.className = 'msg';
+    try {
+      const res = await api('/api/super/export/sql', {
+        method: 'POST',
+        body: JSON.stringify({
+          rangeMonths: parseInt(exportRange.value, 10),
+          types: selectedTypes
+        })
+      });
+      const data = res.data || {};
+      const downloadUrl = data.downloadUrl ? (data.downloadUrl.startsWith('http') ? data.downloadUrl : `${API_BASE}${data.downloadUrl}`) : '';
+      if (!downloadUrl) throw new Error('未返回下载地址');
+
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = data.fileName || 'data-export.sql';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      exportMsg.textContent = `导出成功，共导出${data.rows || 0}条数据，文件：${data.fileName || '-'}`;
+      exportMsg.className = 'msg msg-ok';
+    } catch (e) {
+      exportMsg.textContent = e.message;
+      exportMsg.className = 'msg msg-err';
+    } finally {
+      exportBtn.disabled = false;
+    }
+  };
+
+  cleanupDays.onchange = () => { cleanupMsg.textContent = ''; cleanupMsg.className = 'msg'; };
+  cleanupDays.onkeydown = (e) => {
+    if (e.key === 'Enter') cleanupBtn.click();
+  };
+
+  cleanupBtn.onclick = async () => {
+    const days = parseInt(cleanupDays.value || '0', 10);
+    if (!days || days < 1) {
+      cleanupMsg.textContent = '清理天数需大于0';
+      cleanupMsg.className = 'msg msg-err';
+      return;
+    }
+    cleanupBtn.disabled = true;
+    cleanupMsg.textContent = '正在清理，请稍候...';
+    cleanupMsg.className = 'msg';
+    try {
+      const res = await api('/api/super/cleanup/execute', {
+        method: 'POST',
+        body: JSON.stringify({ days })
+      });
+      const data = res.data || {};
+      cleanupCount.textContent = `${data.cleanedCount || 0}条`;
+      cleanupMsg.textContent = `清理完成，共清理${data.cleanedCount || 0}条信息`; 
+      cleanupMsg.className = 'msg msg-ok';
+    } catch (e) {
+      cleanupMsg.textContent = e.message;
+      cleanupMsg.className = 'msg msg-err';
+    } finally {
+      cleanupBtn.disabled = false;
+    }
+  };
+
+  loadLatestBackup();
 });

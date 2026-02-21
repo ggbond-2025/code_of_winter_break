@@ -160,6 +160,85 @@ Base URL: `http://localhost:8080`
 ### 6.9 全局统计
 - **GET** `/api/super/stats`
 
+### 6.10 查询最近一次备份信息
+- **GET** `/api/super/backup/latest`
+- Response `data` 示例：
+```json
+{
+  "backupRoot": "D:\\project\\server\\backups\\sql",
+  "backupTime": "2026年2月21日 14:22:31",
+  "backupFolder": "D:\\project\\server\\backups\\sql\\backup-20260221-142231",
+  "tableCount": 9
+}
+```
+
+### 6.11 立即备份（按表导出 SQL）
+- **POST** `/api/super/backup/now`
+- 功能说明：将当前数据库内每张表导出为独立 `.sql` 文件，保存到配置目录 `backup.output-dir` 下的时间戳子目录。
+- Response `data` 示例：
+```json
+{
+  "backupTime": "2026年2月21日 14:25:10",
+  "backupFolder": "D:\\project\\server\\backups\\sql\\backup-20260221-142510",
+  "tableCount": 9,
+  "files": ["announcement.sql", "lost_item.sql"]
+}
+```
+
+### 6.12 导出数据（按范围和类型下载 SQL）
+- **POST** `/api/super/export/sql`
+- Request Body：
+```json
+{
+  "rangeMonths": 4,
+  "types": ["FOUND", "LOST", "GLOBAL_ANNOUNCEMENT", "REGION_ANNOUNCEMENT"]
+}
+```
+- `rangeMonths` 可选值：`1`、`2`、`4`、`8`、`12`（12 表示 1 年）
+- `types` 可多选：
+  - `FOUND`：导出失物招领
+  - `LOST`：导出寻物启事
+  - `GLOBAL_ANNOUNCEMENT`：导出全局公告
+  - `REGION_ANNOUNCEMENT`：导出地区公告
+- Response `data` 示例：
+```json
+{
+  "downloadUrl": "/uploads/exports/data-export-20260221-201500-a1b2c3d4.sql",
+  "fileName": "data-export-20260221-201500-a1b2c3d4.sql",
+  "rangeMonths": 4,
+  "types": ["失物招领", "全局公告"],
+  "rows": 123
+}
+```
+
+### 6.13 预估过期数据清理条数
+- **GET** `/api/super/cleanup/preview?days=7`
+- 说明：统计“已归档、已删除、已认领”且状态更新时间早于 `days` 天前的数据条数。
+- Response `data` 示例：
+```json
+{
+  "days": 7,
+  "count": 35,
+  "statuses": ["已归档", "已删除", "已认领"]
+}
+```
+
+### 6.14 执行过期数据清理
+- **POST** `/api/super/cleanup/execute`
+- Request Body：
+```json
+{ "days": 7 }
+```
+- 说明：删除“已归档、已删除、已认领”且状态更新时间早于 `days` 天前的数据。
+- Response `data` 示例：
+```json
+{
+  "days": 7,
+  "cleanedCount": 35,
+  "statuses": ["已归档", "已删除", "已认领"]
+}
+```
+
 ---
 
 ## 7. Swagger 文档

@@ -30,8 +30,7 @@ function renderLayout(app, role, activeNav) {
       { id: 'superAccounts', label: '账号和权限' },
       { id: 'superAnno', label: '公告与内容' },
       { id: 'superMessages', label: '消息查看与处理' },
-      { id: 'superChat', label: '我的聊天' },
-      { id: 'superBackup', label: '数据备份' }
+      { id: 'superBackup', label: '数据管理' }
     ];
   }
 

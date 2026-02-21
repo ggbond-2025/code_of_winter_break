@@ -4,6 +4,7 @@ import com.campus.lostfound.model.LostItem;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -69,4 +70,11 @@ public interface LostItemRepository extends JpaRepository<LostItem, Long> {
     long countByStatus(String status);
 
     long countByType(String type);
+    
+       @Query("SELECT COUNT(i) FROM LostItem i WHERE i.status IN :statuses AND (i.updatedAt < :time OR i.createdAt < :time)")
+       long countExpiredForCleanup(@Param("statuses") List<String> statuses, @Param("time") LocalDateTime time);
+
+       @Modifying
+       @Query("DELETE FROM LostItem i WHERE i.status IN :statuses AND (i.updatedAt < :time OR i.createdAt < :time)")
+       int deleteExpiredForCleanup(@Param("statuses") List<String> statuses, @Param("time") LocalDateTime time);
 }

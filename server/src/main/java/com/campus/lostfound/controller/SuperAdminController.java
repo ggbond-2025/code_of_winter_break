@@ -121,6 +121,39 @@ public class SuperAdminController {
         return ApiResponse.ok(superAdminService.globalStats());
     }
 
+    @GetMapping("/backup/latest")
+    public ApiResponse<Map<String, Object>> latestBackup(HttpServletRequest servletRequest) {
+        requireSuperAdmin(servletRequest);
+        return ApiResponse.ok(superAdminService.latestBackupInfo());
+    }
+
+    @PostMapping("/backup/now")
+    public ApiResponse<Map<String, Object>> backupNow(HttpServletRequest servletRequest) {
+        requireSuperAdmin(servletRequest);
+        return ApiResponse.ok("备份完成", superAdminService.backupNow());
+    }
+
+    @PostMapping("/export/sql")
+    public ApiResponse<Map<String, Object>> exportSql(@RequestBody ExportSqlRequest req, HttpServletRequest servletRequest) {
+        requireSuperAdmin(servletRequest);
+        return ApiResponse.ok("导出完成", superAdminService.exportDataSql(req.rangeMonths(), req.types()));
+    }
+
+    @GetMapping("/cleanup/preview")
+    public ApiResponse<Map<String, Object>> cleanupPreview(
+            @RequestParam(defaultValue = "7") Integer days,
+            HttpServletRequest servletRequest
+    ) {
+        requireSuperAdmin(servletRequest);
+        return ApiResponse.ok(superAdminService.previewExpiredCleanup(days));
+    }
+
+    @PostMapping("/cleanup/execute")
+    public ApiResponse<Map<String, Object>> cleanupExecute(@RequestBody CleanupRequest req, HttpServletRequest servletRequest) {
+        requireSuperAdmin(servletRequest);
+        return ApiResponse.ok("清理完成", superAdminService.cleanupExpiredData(req.days()));
+    }
+
     @GetMapping("/config")
     public ApiResponse<SystemConfig> getConfig(HttpServletRequest servletRequest) {
         requireSuperAdmin(servletRequest);
@@ -173,4 +206,6 @@ public class SuperAdminController {
     public record AnnouncementRequest(@NotBlank String title, @NotBlank String content) {}
     public record ResolveComplaintRequest(@NotBlank String action) {}
     public record SendNotificationRequest(Long targetUserId, String scope, @NotBlank String content) {}
+    public record ExportSqlRequest(Integer rangeMonths, List<String> types) {}
+    public record CleanupRequest(Integer days) {}
 }
