@@ -672,7 +672,7 @@ Router.register('superMessages', function (app) {
         <label>物品类型</label><select id="smCat"><option value="">所有</option><option value="证件">证件</option><option value="电子产品">电子产品</option><option value="生活用品">生活用品</option><option value="文体">文体</option><option value="书籍">书籍</option><option value="其他">其他</option></select>
         <label>地点</label><select id="smLoc"><option value="">所有</option><option value="朝晖校区">朝晖校区</option><option value="屏峰校区">屏峰校区</option><option value="莫干山校区">莫干山校区</option></select>
         <label>时间范围</label><select id="smTime"><option value="">所有</option><option value="7">近7天</option><option value="30">近30天</option><option value="90">近90天</option></select>
-        <label>物品状态</label><select id="smStatus"><option value="">所有</option><option value="APPROVED">未匹配</option><option value="MATCHED">已匹配</option><option value="CLAIMED">已认领</option><option value="ARCHIVED">已归档</option><option value="CANCELLED">已取消</option><option value="ADMIN_DELETED">管理员删除</option></select>
+        <label>物品状态</label><select id="smStatus"><option value="">所有</option><option value="CLAIM_ADMIN_REVIEW">管理员审核申请中</option><option value="CLAIM_OWNER_REVIEW">发布人审核申请中</option><option value="APPROVED">未匹配</option><option value="MATCHED">已匹配</option><option value="CLAIMED">已认领</option><option value="ARCHIVED">已归档</option><option value="CANCELLED">已取消</option><option value="ADMIN_DELETED">管理员删除</option></select>
         <label>物品名查找</label><input type="text" id="smKeyword" />
         <span class="search-icon" id="smSearchBtn">&#128269;</span>
       </div>

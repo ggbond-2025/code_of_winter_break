@@ -67,7 +67,7 @@ async function fillCategorySelect(selectId, includeAll = true) {
 }
 
 function statusLabel(s) {
-  return { PENDING:'待审核', ADMIN_APPROVED:'待发布者审核', APPROVED:'未匹配', REJECTED:'已驳回', MATCHED:'已匹配',
+  return { PENDING:'待审核', ADMIN_APPROVED:'待发布者审核', CLAIM_ADMIN_REVIEW:'管理员审核申请中', CLAIM_OWNER_REVIEW:'发布人审核申请中', CLAIM_ADMIN_REVIEWING:'管理员审核申请中', CLAIM_PUBLISHER_REVIEWING:'发布人审核申请中', APPROVED:'未匹配', REJECTED:'已驳回', MATCHED:'已匹配',
            CLAIMED:'已认领', ARCHIVED:'已归档', CANCELLED:'已取消', ADMIN_DELETED:'管理员删除',
            LOST:'遗失', FOUND:'拾到' }[s] || s;
 }

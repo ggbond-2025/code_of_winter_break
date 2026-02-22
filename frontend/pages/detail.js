@@ -23,7 +23,7 @@ Router.register('detail', async function (app, params) {
     }
     const hasActiveClaim = myClaim && myClaim.status !== 'REJECTED';
     const canClaim = (item.status === 'APPROVED') && Auth.isLoggedIn() && !isOwner && role === 'USER' && !hasActiveClaim;
-    const claimBtnLabel = isLost ? '归还申请' : '失物招领申请';
+    const claimBtnLabel = isLost ? '归还申请' : '认领申请';
     const imgs = item.imageUrls ? item.imageUrls.split(',').filter(Boolean) : [];
     const locStr = item.location || '';
     const locParts = locStr.split(' — ');
@@ -75,26 +75,27 @@ Router.register('detail', async function (app, params) {
     }
 
     if (isOwner) {
-      loadOwnerClaims(item.id);
+      loadOwnerClaims(item.id, isLost);
     }
   } catch (e) {
     main.innerHTML = `<p class="msg msg-err">${e.message}</p>`;
   }
 });
 
-async function loadOwnerClaims(itemId) {
+async function loadOwnerClaims(itemId, isLost) {
   const section = document.getElementById('ownerClaimsSection');
   if (!section) return;
+  const applyLabel = isLost ? '归还申请' : '认领申请';
   try {
     const data = await api(`/api/claims/item/${itemId}`);
     const claims = data.data || [];
     if (claims.length === 0) {
-      section.innerHTML = '<div style="margin-top:20px;padding:16px;border:1px solid #eee"><p class="empty">暂无认领申请</p></div>';
+      section.innerHTML = `<div style="margin-top:20px;padding:16px;border:1px solid #eee"><p class="empty">暂无${applyLabel}</p></div>`;
       return;
     }
     section.innerHTML = `
       <div style="margin-top:20px;border:1px solid #ddd;padding:16px">
-        <h3 style="margin-bottom:12px">认领申请（${claims.length}条）</h3>
+        <h3 style="margin-bottom:12px">${applyLabel}（${claims.length}条）</h3>
         ${claims.map(c => {
           const claimImgs = c.imageUrls ? c.imageUrls.split(',').filter(Boolean) : [];
           return `
@@ -120,14 +121,14 @@ async function loadOwnerClaims(itemId) {
 
     document.querySelectorAll('[data-claim-approve]').forEach(btn => {
       btn.onclick = async () => {
-        if (!confirm('确定通过此认领申请？通过后该物品状态将变为已匹配')) return;
+        if (!confirm(`确定通过此${applyLabel}？通过后该物品状态将变为已匹配`)) return;
         try {
           await api(`/api/claims/${btn.dataset.claimApprove}/review`, {
             method: 'PUT',
             body: JSON.stringify({ status: 'APPROVED', reason: '' })
           });
           alert('已通过！');
-          loadOwnerClaims(itemId);
+          loadOwnerClaims(itemId, isLost);
         } catch (e) { alert(e.message); }
       };
     });
@@ -141,7 +142,7 @@ async function loadOwnerClaims(itemId) {
             method: 'PUT',
             body: JSON.stringify({ status: 'REJECTED', reason: reason })
           });
-          loadOwnerClaims(itemId);
+          loadOwnerClaims(itemId, isLost);
         } catch (e) { alert(e.message); }
       };
     });
@@ -165,6 +166,8 @@ Router.register('claimForm', async function (app, params) {
   try {
     const itemData = await api(`/api/items/${params.id}`);
     const item = itemData.data;
+    const isLost = item.type === 'LOST';
+    const claimPageTitle = isLost ? '归还申请' : '认领申请';
     let myClaim = null;
     try {
       const myClaimData = await api(`/api/claims/my/item/${params.id}`);
@@ -185,7 +188,7 @@ Router.register('claimForm', async function (app, params) {
     main.innerHTML = `
       <div class="publish-form" style="max-width:700px;margin:0 auto">
         <span class="back-arrow" id="claimBack">&#x21A9;</span>
-        <h2 style="text-align:center;margin-bottom:24px"><b>认领申请</b></h2>
+        <h2 style="text-align:center;margin-bottom:24px"><b>${claimPageTitle}</b></h2>
         <p style="margin-bottom:8px"><b>请提供物品其余特征信息或者相关证明信息：</b></p>
         <textarea id="claimMsg" style="width:100%;min-height:180px;border:1px solid #333;padding:12px;font-size:14px;box-sizing:border-box" placeholder="请在此处提供对于物品其他未涉及的特征进行描述或者相关证明信息"></textarea>
         <p style="margin:16px 0 8px"><b>如果有，请在此处附上相关图片：</b></p>
@@ -204,22 +207,11 @@ Router.register('claimForm', async function (app, params) {
     document.getElementById('claimBack').onclick = () => Router.go('detail', { id: params.id });
 
     let claimUploadedUrls = [];
-    let allowClaimImage = true;
     const claimImgInput = document.getElementById('claimImgInput');
     const claimImgBox = document.getElementById('claimImgBox');
     const claimUploadLabel = document.getElementById('claimUploadLabel');
 
-    try {
-      const cfg = await getConfig();
-      allowClaimImage = !!cfg.requireImage;
-      if (!allowClaimImage) {
-        claimImgBox.style.display = 'none';
-        claimUploadedUrls = [];
-      }
-    } catch (_) {}
-
     claimImgInput.onchange = async () => {
-      if (!allowClaimImage) return;
       const files = claimImgInput.files;
       if (!files || files.length === 0) return;
       const remaining = 3 - claimUploadedUrls.length;
@@ -264,7 +256,7 @@ Router.register('claimForm', async function (app, params) {
             itemId: Number(item.id),
             message: msg,
             proof: '',
-            imageUrls: allowClaimImage ? (claimUploadedUrls || []).join(',') : ''
+            imageUrls: (claimUploadedUrls || []).join(',')
           })
         });
         document.getElementById('claimSubmitBtn').disabled = true;

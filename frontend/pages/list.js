@@ -2,35 +2,35 @@ Router.register('home', async function (app) {
   const main = renderLayout(app, 'USER', 'home');
   main.innerHTML = `
     <h2 style="text-align:center;margin:20px 0 30px"><b>${esc(Auth.getUser())}，欢迎登录失物招领系统</b></h2>
-    <h3 style="margin-bottom:16px"><b>目前认领进度：</b></h3>
-    <div id="claimProgress"></div>
-    <div id="claimProgressPager" class="pager"></div>
+    <h3 style="margin-bottom:16px"><b>我发布的帖子：</b></h3>
+    <div id="myPostList"></div>
+    <div id="myPostPager" class="pager"></div>
   `;
 
   let pg = 0;
   async function load() {
     try {
-      const data = await api(`/api/claims/my?page=${pg}&size=8`);
+      const data = await api(`/api/items/my?page=${pg}&size=8`);
       const page = data.data || {};
       const list = page.content || [];
       if (list.length === 0) {
-        document.getElementById('claimProgress').innerHTML = '<p class="empty">暂无认领记录</p>';
-        document.getElementById('claimProgressPager').innerHTML = '';
+        document.getElementById('myPostList').innerHTML = '<p class="empty">暂无发布记录</p>';
+        document.getElementById('myPostPager').innerHTML = '';
         return;
       }
-      document.getElementById('claimProgress').innerHTML = list.map(c => {
-        const item = c.item || {};
+      document.getElementById('myPostList').innerHTML = list.map(item => {
         const imgs = item.imageUrls ? item.imageUrls.split(',').filter(Boolean) : [];
         const isLost = item.type === 'LOST';
         return `
-          <div class="item-card-row" style="cursor:default">
+          <div class="item-card-row" data-id="${item.id}" style="cursor:pointer">
             <div class="card-left">
-              <div class="item-status">目前进度：${statusLabel(c.progressStatus || item.status)}</div>
+              <div class="item-status">目前进度：${statusLabel(item.status)}</div>
               <div class="item-info">
                 <div>物品名称：${esc(item.title || '-')}</div>
                 <div>物品类型：${esc(item.category || '-')}</div>
                 <div>${isLost ? '丢失' : '拾取'}地点：${esc(item.location || '-')}</div>
                 <div>${isLost ? '丢失' : '拾得'}时间：${esc(item.lostTime || '-')}</div>
+                <div style="color:#666">点击可查看详情及申请情况</div>
               </div>
             </div>
             <div class="card-right-wrap">
@@ -42,10 +42,13 @@ Router.register('home', async function (app) {
           </div>
         `;
       }).join('');
-      renderPager(document.getElementById('claimProgressPager'), pg, page.totalPages || 1, p => { pg = p; load(); });
+      document.querySelectorAll('#myPostList .item-card-row[data-id]').forEach(c => {
+        c.onclick = () => Router.go('detail', { id: c.dataset.id });
+      });
+      renderPager(document.getElementById('myPostPager'), pg, page.totalPages || 1, p => { pg = p; load(); });
     } catch (e) {
-      document.getElementById('claimProgress').innerHTML = '<p class="empty">暂无认领记录</p>';
-      document.getElementById('claimProgressPager').innerHTML = '';
+      document.getElementById('myPostList').innerHTML = '<p class="empty">暂无发布记录</p>';
+      document.getElementById('myPostPager').innerHTML = '';
     }
   }
   load();
@@ -59,7 +62,7 @@ Router.register('search', function (app) {
       <label>物品类型</label><select id="fCat"><option value="">所有</option><option value="证件">证件</option><option value="电子产品">电子产品</option><option value="生活用品">生活用品</option><option value="文体">文体</option><option value="书籍">书籍</option><option value="其他">其他</option></select>
       <label>地点</label><select id="fLoc"><option value="">所有</option><option value="朝晖校区">朝晖校区</option><option value="屏峰校区">屏峰校区</option><option value="莫干山校区">莫干山校区</option></select>
       <label>时间范围</label><select id="fTime"><option value="">所有</option><option value="7">近7天</option><option value="30">近30天</option><option value="90">近90天</option></select>
-      <label>物品状态</label><select id="fStatus"><option value="">所有</option><option value="APPROVED">未匹配</option><option value="MATCHED">已匹配</option><option value="CLAIMED">已认领</option></select>
+      <label>物品状态</label><select id="fStatus"><option value="">所有</option><option value="CLAIM_ADMIN_REVIEW">管理员审核申请中</option><option value="CLAIM_OWNER_REVIEW">发布人审核申请中</option><option value="APPROVED">未匹配</option><option value="MATCHED">已匹配</option></select>
       <label>物品名查找</label><input type="text" id="fKeyword" />
       <span class="search-icon" id="searchBtn">&#128269;</span>
     </div>

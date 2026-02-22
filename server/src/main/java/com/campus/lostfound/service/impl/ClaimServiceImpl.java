@@ -3,14 +3,12 @@ package com.campus.lostfound.service.impl;
 import com.campus.lostfound.model.ChatMessage;
 import com.campus.lostfound.model.ClaimRecord;
 import com.campus.lostfound.model.LostItem;
-import com.campus.lostfound.model.SystemConfig;
 import com.campus.lostfound.model.User;
 import com.campus.lostfound.repository.ChatMessageRepository;
 import com.campus.lostfound.repository.ClaimRecordRepository;
 import com.campus.lostfound.repository.LostItemRepository;
 import com.campus.lostfound.repository.UserRepository;
 import com.campus.lostfound.service.ClaimService;
-import com.campus.lostfound.service.SystemConfigService;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -20,22 +18,25 @@ import java.util.stream.Collectors;
 @Service
 public class ClaimServiceImpl implements ClaimService {
 
+    private static final String STATUS_APPROVED = "APPROVED";
+    private static final String STATUS_MATCHED = "MATCHED";
+    private static final String STATUS_CLAIMED = "CLAIMED";
+    private static final String STATUS_CLAIM_ADMIN_REVIEW = "CLAIM_ADMIN_REVIEW";
+    private static final String STATUS_CLAIM_OWNER_REVIEW = "CLAIM_OWNER_REVIEW";
+
     private final ClaimRecordRepository claimRecordRepository;
     private final LostItemRepository lostItemRepository;
     private final UserRepository userRepository;
     private final ChatMessageRepository chatMessageRepository;
-    private final SystemConfigService systemConfigService;
 
     public ClaimServiceImpl(ClaimRecordRepository claimRecordRepository,
                             LostItemRepository lostItemRepository,
                             UserRepository userRepository,
-                            ChatMessageRepository chatMessageRepository,
-                            SystemConfigService systemConfigService) {
+                            ChatMessageRepository chatMessageRepository) {
         this.claimRecordRepository = claimRecordRepository;
         this.lostItemRepository = lostItemRepository;
         this.userRepository = userRepository;
         this.chatMessageRepository = chatMessageRepository;
-        this.systemConfigService = systemConfigService;
     }
 
     @Override
@@ -48,26 +49,22 @@ public class ClaimServiceImpl implements ClaimService {
         if (item.getCreator().getId().equals(userId)) {
             throw new IllegalArgumentException("不能对自己发布的物品申请");
         }
-        if ("CLAIMED".equals(item.getStatus()) || "MATCHED".equals(item.getStatus())) {
+        if (!STATUS_APPROVED.equals(item.getStatus())) {
             throw new IllegalArgumentException("物品已被申请或已匹配");
         }
         ClaimRecord latest = claimRecordRepository.findTopByItemIdAndClaimerIdOrderByCreatedAtDesc(itemId, userId);
         if (latest != null && !"REJECTED".equals(latest.getStatus())) {
             throw new IllegalArgumentException("该物品已提交过申请，需等待审核结果");
         }
-        SystemConfig cfg = systemConfigService.getConfig();
-        if (!cfg.isRequireImage()) {
-            String imgs = imageUrls == null ? "" : imageUrls.trim();
-            if (!imgs.isEmpty()) throw new IllegalArgumentException("当前不允许上传图片");
-        }
-
         ClaimRecord record = new ClaimRecord();
         record.setItem(item);
         record.setClaimer(user);
         record.setMessage(message);
         record.setProof(proof);
         record.setImageUrls(imageUrls);
-        return claimRecordRepository.save(record);
+        ClaimRecord saved = claimRecordRepository.save(record);
+        refreshItemStatusByClaims(item);
+        return saved;
     }
 
     @Override
@@ -126,7 +123,7 @@ public class ClaimServiceImpl implements ClaimService {
             if ("APPROVED".equals(status)) {
                 record.setStatus("APPROVED");
                 LostItem item = record.getItem();
-                item.setStatus("MATCHED");
+                item.setStatus(STATUS_MATCHED);
                 lostItemRepository.save(item);
             } else if ("REJECTED".equals(status)) {
                 if (reason == null || reason.trim().isEmpty()) {
@@ -140,7 +137,30 @@ public class ClaimServiceImpl implements ClaimService {
         } else {
             throw new IllegalArgumentException("该申请已审核，无法重复操作");
         }
-        return claimRecordRepository.save(record);
+        ClaimRecord saved = claimRecordRepository.save(record);
+        refreshItemStatusByClaims(record.getItem());
+        return saved;
+    }
+
+    private void refreshItemStatusByClaims(LostItem item) {
+        if (item == null || item.getId() == null) return;
+        if (STATUS_CLAIMED.equals(item.getStatus())) return;
+
+        List<ClaimRecord> claims = claimRecordRepository.findByItemIdOrderByCreatedAtDesc(item.getId());
+        boolean hasApproved = claims.stream().anyMatch(c -> "APPROVED".equals(c.getStatus()));
+        boolean hasAdminApproved = claims.stream().anyMatch(c -> "ADMIN_APPROVED".equals(c.getStatus()));
+        boolean hasPending = claims.stream().anyMatch(c -> "PENDING".equals(c.getStatus()));
+
+        if (hasApproved) {
+            item.setStatus(STATUS_MATCHED);
+        } else if (hasAdminApproved) {
+            item.setStatus(STATUS_CLAIM_OWNER_REVIEW);
+        } else if (hasPending) {
+            item.setStatus(STATUS_CLAIM_ADMIN_REVIEW);
+        } else {
+            item.setStatus(STATUS_APPROVED);
+        }
+        lostItemRepository.save(item);
     }
 
     @Override

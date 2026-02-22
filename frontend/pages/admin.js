@@ -228,7 +228,8 @@ Router.register('adminManage', function (app) {
       <label>物品类型</label><select id="mCat"><option value="">所有</option><option value="证件">证件</option><option value="电子产品">电子产品</option><option value="生活用品">生活用品</option><option value="文体">文体</option><option value="书籍">书籍</option><option value="其他">其他</option></select>
       <label>地点</label><select id="mLoc"><option value="">所有</option><option value="朝晖校区">朝晖校区</option><option value="屏峰校区">屏峰校区</option><option value="莫干山校区">莫干山校区</option></select>
       <label>时间范围</label><select id="mTime"><option value="">所有</option><option value="7">近7天</option><option value="30">近30天</option><option value="90">近90天</option></select>
-      <label>物品状态</label><select id="mStatus"><option value="">所有</option><option value="APPROVED">未匹配</option><option value="MATCHED">已匹配</option><option value="CLAIMED">已认领</option><option value="ARCHIVED">已归档</option><option value="CANCELLED">已取消</option></select>
+      <label>物品状态</label><select id="mStatus"><option value="">所有</option><option value="CLAIM_ADMIN_REVIEW">管理员审核申请中</option><option value="CLAIM_OWNER_REVIEW">发布人审核申请中</option><option value="APPROVED">未匹配</option><option value="MATCHED">已匹配</option><option value="CLAIMED">已认领</option><option value="ARCHIVED">已归档</option><option value="CANCELLED">已取消</option></select>
+      <label>物品名查找</label><input type="text" id="mKeyword" />
       <span class="search-icon" id="mSearchBtn">&#128269;</span>
     </div>
     <div id="manageList"></div>
@@ -271,8 +272,9 @@ Router.register('adminManage', function (app) {
     const cat = document.getElementById('mCat').value;
     const loc = document.getElementById('mLoc').value;
     const status = document.getElementById('mStatus').value;
+    const kw = document.getElementById('mKeyword').value.trim();
     try {
-      const data = await api(`/api/admin/items?type=${type}&category=${encodeURIComponent(cat)}&location=${encodeURIComponent(loc)}&status=${status}&page=${pg}&size=8`);
+      const data = await api(`/api/admin/items?keyword=${encodeURIComponent(kw)}&type=${type}&category=${encodeURIComponent(cat)}&location=${encodeURIComponent(loc)}&status=${status}&page=${pg}&size=8`);
       const page = data.data;
       const list = page.content || [];
       document.getElementById('manageList').innerHTML = list.length === 0
@@ -331,6 +333,7 @@ Router.register('adminManage', function (app) {
   ['mType', 'mCat', 'mLoc', 'mTime', 'mStatus'].forEach(id => {
     document.getElementById(id).onchange = () => { pg = 0; load(); };
   });
+  document.getElementById('mKeyword').onkeydown = e => { if (e.key === 'Enter') { pg = 0; load(); } };
 
   document.getElementById('statusModalConfirm').onclick = async () => {
     const modal = document.getElementById('statusModal');
@@ -420,7 +423,7 @@ Router.register('adminMaintain', async function (app) {
           <label>物品类型</label><select id="muCat"><option value="">所有</option><option value="证件">证件</option><option value="电子产品">电子产品</option><option value="生活用品">生活用品</option><option value="文体">文体</option><option value="书籍">书籍</option><option value="其他">其他</option></select>
           <label>地点</label><select id="muLoc"><option value="">所有</option><option value="朝晖校区">朝晖校区</option><option value="屏峰校区">屏峰校区</option><option value="莫干山校区">莫干山校区</option></select>
           <label>时间范围</label><select id="muTime"><option value="">所有</option><option value="7">近7天</option><option value="30">近30天</option><option value="90">近90天</option></select>
-          <label>物品状态</label><select id="muStatus"><option value="">所有</option><option value="PENDING">待审核</option><option value="APPROVED">未匹配</option><option value="REJECTED">已驳回</option><option value="MATCHED">已匹配</option><option value="CLAIMED">已认领</option><option value="ARCHIVED">已归档</option><option value="CANCELLED">已取消</option></select>
+          <label>物品状态</label><select id="muStatus"><option value="">所有</option><option value="PENDING">待审核</option><option value="CLAIM_ADMIN_REVIEW">管理员审核申请中</option><option value="CLAIM_OWNER_REVIEW">发布人审核申请中</option><option value="APPROVED">未匹配</option><option value="REJECTED">已驳回</option><option value="MATCHED">已匹配</option><option value="CLAIMED">已认领</option><option value="ARCHIVED">已归档</option><option value="CANCELLED">已取消</option></select>
           <label>物品名查找</label><input type="text" id="muKeyword" />
           <span class="search-icon" id="muSearchBtn">&#128269;</span>
         </div>
@@ -553,8 +556,9 @@ Router.register('adminMaintain', async function (app) {
         <button class="btn-outline" id="mfExportBtn" style="margin-bottom:12px">导出统计数据</button>
         <div class="filter-bar">
           <label>消息类型</label><select id="mfType"><option value="">所有</option><option value="LOST">寻物启事</option><option value="FOUND">失物招领</option></select>
+          <label>物品类型</label><select id="mfCat"><option value="">所有</option><option value="证件">证件</option><option value="电子产品">电子产品</option><option value="生活用品">生活用品</option><option value="文体">文体</option><option value="书籍">书籍</option><option value="其他">其他</option></select>
           <label>地点</label><select id="mfLoc"><option value="">所有</option><option value="朝晖校区">朝晖校区</option><option value="屏峰校区">屏峰校区</option><option value="莫干山校区">莫干山校区</option></select>
-          <label>物品状态</label><select id="mfStatus"><option value="">所有</option><option value="PENDING">待审核</option><option value="APPROVED">未匹配</option><option value="REJECTED">已驳回</option><option value="MATCHED">已匹配</option><option value="CLAIMED">已认领</option><option value="ARCHIVED">已归档</option><option value="CANCELLED">已取消</option></select>
+          <label>物品状态</label><select id="mfStatus"><option value="">所有</option><option value="PENDING">待审核</option><option value="CLAIM_ADMIN_REVIEW">管理员审核申请中</option><option value="CLAIM_OWNER_REVIEW">发布人审核申请中</option><option value="APPROVED">未匹配</option><option value="REJECTED">已驳回</option><option value="MATCHED">已匹配</option><option value="CLAIMED">已认领</option><option value="ARCHIVED">已归档</option><option value="CANCELLED">已取消</option></select>
           <label>时间范围</label><select id="mfTime"><option value="">所有</option><option value="7">近7天</option><option value="30">近30天</option><option value="90">近90天</option></select>
           <label>物品名查找</label><input type="text" id="mfKeyword" />
           <span class="search-icon" id="mfSearchBtn">&#128269;</span>
@@ -564,22 +568,39 @@ Router.register('adminMaintain', async function (app) {
       `;
 
       let pg = 0;
-      async function load() {
+      fillCategorySelect('mfCat');
+
+      function buildFilterParams(pageIndex, pageSize) {
         const type = document.getElementById('mfType').value;
+        const cat = document.getElementById('mfCat').value;
         const loc = document.getElementById('mfLoc').value;
         const status = document.getElementById('mfStatus').value;
         const time = document.getElementById('mfTime').value;
         const kw = document.getElementById('mfKeyword').value.trim();
+        const params = new URLSearchParams({
+          keyword: kw,
+          type,
+          category: cat,
+          location: loc,
+          status,
+          page: String(pageIndex),
+          size: String(pageSize)
+        });
+        if (time) params.set('time', time);
+        return params;
+      }
+
+      function csvEscape(val) {
+        const s = String(val == null ? '' : val);
+        if (s.includes('"') || s.includes(',') || s.includes('\n') || s.includes('\r')) {
+          return '"' + s.replace(/"/g, '""') + '"';
+        }
+        return s;
+      }
+
+      async function load() {
         try {
-          const params = new URLSearchParams({
-            keyword: kw,
-            type,
-            location: loc,
-            status,
-            page: String(pg),
-            size: '8'
-          });
-          if (time) params.set('time', time);
+          const params = buildFilterParams(pg, 8);
           const data = await api(`/api/admin/items?${params.toString()}`);
           const page = data.data;
           const list = page.content || [];
@@ -596,8 +617,65 @@ Router.register('adminMaintain', async function (app) {
         }
       }
 
+      document.getElementById('mfExportBtn').onclick = async () => {
+        const btn = document.getElementById('mfExportBtn');
+        const oldText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = '导出中...';
+        try {
+          const pageSize = 200;
+          const firstData = await api(`/api/admin/items?${buildFilterParams(0, pageSize).toString()}`);
+          const firstPage = firstData.data || {};
+          const totalPages = firstPage.totalPages || 1;
+          const all = [...(firstPage.content || [])];
+
+          for (let p = 1; p < totalPages; p++) {
+            const d = await api(`/api/admin/items?${buildFilterParams(p, pageSize).toString()}`);
+            const page = d.data || {};
+            all.push(...(page.content || []));
+          }
+
+          if (all.length === 0) {
+            alert('当前筛选条件下无可导出数据');
+            return;
+          }
+
+          const headers = ['物品ID', '消息类型', '物品名称', '物品类型', '地点', '时间', '当前进度', '联系人', '联系方式', '发布时间'];
+          const rows = all.map(item => [
+            item.id || '',
+            item.type === 'LOST' ? '寻物启事' : '失物招领',
+            item.title || '',
+            item.category || '',
+            item.location || '',
+            item.lostTime || '',
+            statusLabel(item.status || ''),
+            item.contactName || '',
+            item.contactPhone || '',
+            fmtTime(item.createdAt)
+          ]);
+
+          const csv = '\uFEFF' + [headers, ...rows].map(row => row.map(csvEscape).join(',')).join('\r\n');
+          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          const now = new Date();
+          const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
+          a.href = url;
+          a.download = `管理员筛选统计_${stamp}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        } catch (e) {
+          alert(e.message || '导出失败');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = oldText;
+        }
+      };
+
       document.getElementById('mfSearchBtn').onclick = () => { pg = 0; load(); };
-      ['mfType', 'mfLoc', 'mfStatus', 'mfTime'].forEach(id => {
+      ['mfType', 'mfCat', 'mfLoc', 'mfStatus', 'mfTime'].forEach(id => {
         document.getElementById(id).onchange = () => { pg = 0; load(); };
       });
       document.getElementById('mfKeyword').onkeydown = e => { if (e.key === 'Enter') { pg = 0; load(); } };

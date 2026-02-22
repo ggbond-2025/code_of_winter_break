@@ -98,8 +98,12 @@ public class ItemServiceImpl implements ItemService {
         String kw = keyword == null ? "" : keyword;
         String cat = category == null ? "" : category;
         String tp = type == null ? "" : type;
+        List<String> publicStatuses = List.of("CLAIM_ADMIN_REVIEW", "CLAIM_OWNER_REVIEW", "APPROVED", "MATCHED");
         if (status == null || status.isEmpty()) {
-            return lostItemRepository.searchByStatuses(kw, List.of("APPROVED", "MATCHED"), cat, tp, effectiveLocation, PageRequest.of(page, size));
+            return lostItemRepository.searchByStatuses(kw, publicStatuses, cat, tp, effectiveLocation, PageRequest.of(page, size));
+        }
+        if (!publicStatuses.contains(status)) {
+            return Page.empty(PageRequest.of(page, size));
         }
         return lostItemRepository.search(kw, status, cat, tp, effectiveLocation, PageRequest.of(page, size));
     }
