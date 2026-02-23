@@ -134,6 +134,7 @@ Router.register('superGlobal', async function (app) {
         const cats = (cfg.categories || '').split(/[,，;]/).map(s => s.trim()).filter(Boolean);
         const normRows = [
           `是否开启违禁词检查：${cfg.forbidWordCheck ? '是' : '否'}`,
+          `目前违禁词：${(cfg.forbiddenWords || '').split(/[,，;；\s\n\r\t]+/).map(s => s.trim()).filter(Boolean).join('、') || '-'}`,
           `是否上传图片：${cfg.requireImage ? '是' : '否'}`,
           `是否填写地址：${cfg.requireLocationDetail ? '是' : '否'}`,
           `是否开启发布审核：${cfg.enableReview ? '是' : '否'}`,
@@ -191,6 +192,12 @@ Router.register('superGlobal', async function (app) {
           body.innerHTML = `
             <div style="display:flex;flex-direction:column;gap:8px">
               <label><input type="checkbox" id="normForbid" ${cfg.forbidWordCheck ? 'checked' : ''} /> 是否开启违禁词检查</label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input id="normWordInput" placeholder="输入违禁词后点击添加" style="flex:1" />
+                <button type="button" class="btn-outline" id="normWordAddBtn">添加</button>
+              </div>
+              <textarea id="normWords" style="width:100%;min-height:90px" placeholder="可手动输入，支持逗号/空格/换行分隔">${esc(cfg.forbiddenWords || '')}</textarea>
+              <div id="normWordsView" style="font-size:12px;color:#555;line-height:1.8"></div>
               <label><input type="checkbox" id="normImage" ${cfg.requireImage ? 'checked' : ''} /> 是否上传图片</label>
               <label><input type="checkbox" id="normLocation" ${cfg.requireLocationDetail ? 'checked' : ''} /> 是否填写地址</label>
               <label><input type="checkbox" id="normReview" ${cfg.enableReview ? 'checked' : ''} /> 是否开启发布审核</label>
@@ -198,6 +205,31 @@ Router.register('superGlobal', async function (app) {
               <input id="normDescMax" type="number" style="width:100%" value="${cfg.descMaxLength || 0}" />
             </div>
           `;
+
+          const wordsArea = document.getElementById('normWords');
+          const wordsView = document.getElementById('normWordsView');
+          const wordInput = document.getElementById('normWordInput');
+          const addBtn = document.getElementById('normWordAddBtn');
+
+          const normalizeWords = (text) => {
+            return (text || '').split(/[,，;；\s\n\r\t]+/).map(s => s.trim()).filter(Boolean);
+          };
+          const refreshWordsView = () => {
+            const words = normalizeWords(wordsArea.value);
+            wordsView.textContent = words.length ? ('当前已添加：' + words.join('、')) : '当前未添加违禁词';
+          };
+
+          wordsArea.addEventListener('input', refreshWordsView);
+          addBtn.onclick = () => {
+            const word = (wordInput.value || '').trim();
+            if (!word) return;
+            const words = normalizeWords(wordsArea.value);
+            if (!words.includes(word)) words.push(word);
+            wordsArea.value = words.join(',');
+            wordInput.value = '';
+            refreshWordsView();
+          };
+          refreshWordsView();
         }
         modal.style.display = 'flex';
         document.getElementById('paramConfirm').onclick = async () => {
@@ -211,6 +243,7 @@ Router.register('superGlobal', async function (app) {
               update.publishCooldownMinutes = parseInt(document.getElementById('paramCooldown').value || '0', 10);
             } else {
               update.forbidWordCheck = document.getElementById('normForbid').checked;
+              update.forbiddenWords = document.getElementById('normWords').value.trim();
               update.requireImage = document.getElementById('normImage').checked;
               update.requireLocationDetail = document.getElementById('normLocation').checked;
               update.enableReview = document.getElementById('normReview').checked;

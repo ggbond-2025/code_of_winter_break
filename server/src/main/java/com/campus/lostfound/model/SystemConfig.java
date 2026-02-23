@@ -22,6 +22,9 @@ public class SystemConfig {
     @Column(nullable = false)
     private boolean forbidWordCheck = true;
 
+    @Column(nullable = false, length = 2000)
+    private String forbiddenWords = "广告,代购,赌博,色情,诈骗";
+
     @Column(nullable = false)
     private boolean requireImage = false;
 
@@ -52,6 +55,8 @@ public class SystemConfig {
     public void setPublishCooldownMinutes(Integer publishCooldownMinutes) { this.publishCooldownMinutes = publishCooldownMinutes; }
     public boolean isForbidWordCheck() { return forbidWordCheck; }
     public void setForbidWordCheck(boolean forbidWordCheck) { this.forbidWordCheck = forbidWordCheck; }
+    public String getForbiddenWords() { return forbiddenWords; }
+    public void setForbiddenWords(String forbiddenWords) { this.forbiddenWords = forbiddenWords; }
     public boolean isRequireImage() { return requireImage; }
     public void setRequireImage(boolean requireImage) { this.requireImage = requireImage; }
     public boolean isRequireLocationDetail() { return requireLocationDetail; }

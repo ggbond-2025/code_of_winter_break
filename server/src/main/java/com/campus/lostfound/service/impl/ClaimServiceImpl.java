@@ -9,6 +9,7 @@ import com.campus.lostfound.repository.ClaimRecordRepository;
 import com.campus.lostfound.repository.LostItemRepository;
 import com.campus.lostfound.repository.UserRepository;
 import com.campus.lostfound.service.ClaimService;
+import com.campus.lostfound.service.SystemConfigService;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -28,15 +29,18 @@ public class ClaimServiceImpl implements ClaimService {
     private final LostItemRepository lostItemRepository;
     private final UserRepository userRepository;
     private final ChatMessageRepository chatMessageRepository;
+    private final SystemConfigService systemConfigService;
 
     public ClaimServiceImpl(ClaimRecordRepository claimRecordRepository,
                             LostItemRepository lostItemRepository,
                             UserRepository userRepository,
-                            ChatMessageRepository chatMessageRepository) {
+                            ChatMessageRepository chatMessageRepository,
+                            SystemConfigService systemConfigService) {
         this.claimRecordRepository = claimRecordRepository;
         this.lostItemRepository = lostItemRepository;
         this.userRepository = userRepository;
         this.chatMessageRepository = chatMessageRepository;
+        this.systemConfigService = systemConfigService;
     }
 
     @Override
@@ -55,6 +59,9 @@ public class ClaimServiceImpl implements ClaimService {
         ClaimRecord latest = claimRecordRepository.findTopByItemIdAndClaimerIdOrderByCreatedAtDesc(itemId, userId);
         if (latest != null && !"REJECTED".equals(latest.getStatus())) {
             throw new IllegalArgumentException("该物品已提交过申请，需等待审核结果");
+        }
+        if (systemConfigService.containsForbiddenWord(java.util.List.of(message == null ? "" : message, proof == null ? "" : proof))) {
+            throw new IllegalArgumentException("信息包含违禁词，请重新发布");
         }
         ClaimRecord record = new ClaimRecord();
         record.setItem(item);

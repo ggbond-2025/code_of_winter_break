@@ -186,7 +186,7 @@ Router.register('publishForm', function (app, params) {
     uploadLabel.style.display = '';
   });
 
-  document.getElementById('pubClear').onclick = () => {
+  function clearPublishForm() {
     ['pubTitle','pubLocation','pubTime','pubDesc','pubContact','pubPhone'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
@@ -198,6 +198,10 @@ Router.register('publishForm', function (app, params) {
     uploadedUrls = [];
     previewBox.querySelectorAll('div[style]').forEach(d => { if (d !== uploadLabel) d.remove(); });
     uploadLabel.style.display = '';
+  };
+
+  document.getElementById('pubClear').onclick = () => {
+    clearPublishForm();
   };
 
   document.getElementById('pubSubmit').onclick = async () => {
@@ -234,6 +238,12 @@ Router.register('publishForm', function (app, params) {
       document.getElementById('pubMsg').className = 'msg msg-ok';
       setTimeout(() => Router.go('history'), 1200);
     } catch (e) {
+      if ((e.message || '').includes('信息包含违禁词')) {
+        document.getElementById('pubMsg').textContent = '信息包含违禁词，请重新发布';
+        document.getElementById('pubMsg').className = 'msg msg-err';
+        clearPublishForm();
+        return;
+      }
       document.getElementById('pubMsg').textContent = e.message;
       document.getElementById('pubMsg').className = 'msg msg-err';
     }

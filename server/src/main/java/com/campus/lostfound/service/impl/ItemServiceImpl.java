@@ -64,7 +64,9 @@ public class ItemServiceImpl implements ItemService {
         }
         if (cfg.isForbidWordCheck()) {
             String combined = (title == null ? "" : title) + " " + (description == null ? "" : description);
-            if (hasForbiddenWord(combined)) throw new IllegalArgumentException("内容包含违禁词");
+            if (systemConfigService.containsForbiddenWord(combined)) {
+                throw new IllegalArgumentException("信息包含违禁词，请重新发布");
+            }
         }
 
         LostItem item = new LostItem();
@@ -84,12 +86,6 @@ public class ItemServiceImpl implements ItemService {
         item.setCreator(user);
 
         return lostItemRepository.save(item);
-    }
-
-    private boolean hasForbiddenWord(String content) {
-        if (content == null) return false;
-        String c = content.toLowerCase();
-        return c.contains("广告") || c.contains("代购") || c.contains("赌博") || c.contains("色情") || c.contains("诈骗");
     }
 
     @Override

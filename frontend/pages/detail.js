@@ -211,6 +211,16 @@ Router.register('claimForm', async function (app, params) {
     const claimImgBox = document.getElementById('claimImgBox');
     const claimUploadLabel = document.getElementById('claimUploadLabel');
 
+    function clearClaimForm() {
+      const msgInput = document.getElementById('claimMsg');
+      if (msgInput) msgInput.value = '';
+      claimUploadedUrls = [];
+      claimImgBox.querySelectorAll('[data-crmurl]').forEach(btn => {
+        if (btn.parentElement) btn.parentElement.remove();
+      });
+      claimUploadLabel.style.display = '';
+    }
+
     claimImgInput.onchange = async () => {
       const files = claimImgInput.files;
       if (!files || files.length === 0) return;
@@ -263,6 +273,12 @@ Router.register('claimForm', async function (app, params) {
         resultBox.style.display = 'block';
         resultContent.innerHTML = '<p style="color:#27ae60;font-size:16px"><b>递交成功！ 可以返回 主页-认领进度 来查看当前认领进度！希望你能尽快找到自己的物品！</b></p>';
       } catch (e) {
+        if ((e.message || '').includes('信息包含违禁词')) {
+          alert('信息包含违禁词，请重新发布');
+          clearClaimForm();
+          resultBox.style.display = 'none';
+          return;
+        }
         resultBox.style.display = 'block';
         resultContent.innerHTML = '<p style="color:#e74c3c;font-size:16px"><b>递交失败！' + esc(e.message) + '</b></p>';
       }
