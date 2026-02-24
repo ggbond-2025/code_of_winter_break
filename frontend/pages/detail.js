@@ -9,6 +9,9 @@ Router.register('detail', async function (app, params) {
   try {
     const data = await api(`/api/items/${params.id}`);
     const item = data.data;
+    const detailFrom = sessionStorage.getItem('lf_detail_from');
+    const detailFromItem = sessionStorage.getItem('lf_detail_from_item');
+    const fromSearch = detailFrom === 'search' && detailFromItem === String(item.id);
     const isOwner = String(item.creator?.id) === Auth.getUserId();
     const isLost = item.type === 'LOST';
     const typeLabel = isLost ? '寻物启事' : '失物招领';
@@ -67,11 +70,26 @@ Router.register('detail', async function (app, params) {
       </div>
     `;
 
-    document.getElementById('backBtn').onclick = () => history.back();
+    document.getElementById('backBtn').onclick = () => {
+      if (fromSearch) {
+        sessionStorage.removeItem('lf_detail_from');
+        sessionStorage.removeItem('lf_detail_from_item');
+        sessionStorage.removeItem('lf_claim_back_route');
+        Router.go('search');
+        return;
+      }
+      history.back();
+    };
 
     const goClaimBtn = document.getElementById('goClaimBtn');
     if (goClaimBtn) {
-      goClaimBtn.onclick = () => Router.go('claimForm', { id: item.id });
+      goClaimBtn.onclick = () => {
+        if (fromSearch) {
+          sessionStorage.setItem('lf_claim_back_route', 'search');
+          sessionStorage.setItem('lf_detail_from_item', String(item.id));
+        }
+        Router.go('claimForm', { id: item.id });
+      };
     }
 
     if (isOwner) {
@@ -112,7 +130,10 @@ async function loadOwnerClaims(itemId, isLost) {
                   <button class="btn-sm btn-danger" data-claim-reject="${c.id}">驳回</button>
                 </div>
               ` : ''}
-              ${c.status === 'APPROVED' ? `<div style="margin-top:8px"><button class="btn-sm btn-primary" data-goto-chat="${c.id}">进入聊天</button></div>` : ''}
+              <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap">
+                ${c.status === 'APPROVED' ? `<button class="btn-sm btn-primary" data-goto-chat="${c.id}" data-peer-id="${c.claimer?.id || ''}">进入聊天</button>` : ''}
+                ${c.claimer && String(c.claimer.id) !== Auth.getUserId() && c.status !== 'APPROVED' ? `<button class="btn-sm btn-outline" data-claim-report="${c.id}">举报该申请</button>` : ''}
+              </div>
             </div>
           `;
         }).join('')}
@@ -148,7 +169,29 @@ async function loadOwnerClaims(itemId, isLost) {
     });
 
     document.querySelectorAll('[data-goto-chat]').forEach(btn => {
-      btn.onclick = () => Router.go('chatDetail', { claimId: btn.dataset.gotoChat });
+      btn.onclick = () => Router.go('chatDetail', { claimId: btn.dataset.gotoChat, peerId: btn.dataset.peerId });
+    });
+
+    document.querySelectorAll('[data-claim-report]').forEach(btn => {
+      btn.onclick = async () => {
+        const reason = prompt('请选择/输入举报原因：违规广告、虚假信息、恶意申请、其他');
+        if (reason === null) return;
+        const detail = prompt('请填写具体说明（可选）：') || '';
+        try {
+          await api('/api/complaints', {
+            method: 'POST',
+            body: JSON.stringify({
+              targetType: 'CLAIM_APPLICATION',
+              claimId: Number(btn.dataset.claimReport),
+              reason: reason.trim() || '其他',
+              detail: detail.trim()
+            })
+          });
+          alert('投诉已提交，等待超级管理员审核');
+        } catch (e) {
+          alert(e.message);
+        }
+      };
     });
   } catch (e) {
     section.innerHTML = `<p class="msg msg-err">${e.message}</p>`;
@@ -164,6 +207,8 @@ Router.register('claimForm', async function (app, params) {
   main.innerHTML = '<p>加载中...</p>';
 
   try {
+    const claimBackRoute = sessionStorage.getItem('lf_claim_back_route') || '';
+
     const itemData = await api(`/api/items/${params.id}`);
     const item = itemData.data;
     const isLost = item.type === 'LOST';
@@ -173,6 +218,17 @@ Router.register('claimForm', async function (app, params) {
       const myClaimData = await api(`/api/claims/my/item/${params.id}`);
       myClaim = myClaimData.data || null;
     } catch (_) {}
+    function goBackAfterClaim() {
+      if (claimBackRoute === 'search') {
+        sessionStorage.removeItem('lf_detail_from');
+        sessionStorage.removeItem('lf_detail_from_item');
+        sessionStorage.removeItem('lf_claim_back_route');
+        Router.go('search');
+        return;
+      }
+      Router.go('detail', { id: params.id });
+    }
+
     if (myClaim && myClaim.status !== 'REJECTED') {
       main.innerHTML = `
         <div class="publish-form" style="max-width:700px;margin:0 auto">
@@ -181,7 +237,7 @@ Router.register('claimForm', async function (app, params) {
           <p style="text-align:center;color:#666">当前状态：${claimStatusLabel(myClaim.status)}</p>
         </div>
       `;
-      document.getElementById('claimBack').onclick = () => Router.go('detail', { id: params.id });
+      document.getElementById('claimBack').onclick = () => goBackAfterClaim();
       return;
     }
 
@@ -204,7 +260,7 @@ Router.register('claimForm', async function (app, params) {
       </div>
     `;
 
-    document.getElementById('claimBack').onclick = () => Router.go('detail', { id: params.id });
+    document.getElementById('claimBack').onclick = () => goBackAfterClaim();
 
     let claimUploadedUrls = [];
     const claimImgInput = document.getElementById('claimImgInput');

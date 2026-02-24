@@ -21,8 +21,17 @@ public class ComplaintController {
     public ApiResponse<ComplaintRecord> create(@RequestBody CreateComplaintRequest req, HttpServletRequest servletRequest) {
         Long userId = (Long) servletRequest.getAttribute("loginUserId");
         if (userId == null) throw new IllegalArgumentException("请先登录");
-        return ApiResponse.ok(complaintService.create(userId, req.itemId(), req.reason(), req.detail()));
+        return ApiResponse.ok(complaintService.create(userId, req.targetType(), req.itemId(), req.claimId(), req.messageId(), req.reason(), req.detail()));
     }
 
-    public record CreateComplaintRequest(Long itemId, @NotBlank String reason, String detail) {}
+    @GetMapping("/chat/reported")
+    public ApiResponse<Boolean> hasChatReported(@RequestParam Long claimId,
+                                                @RequestParam Long peerId,
+                                                HttpServletRequest servletRequest) {
+        Long userId = (Long) servletRequest.getAttribute("loginUserId");
+        if (userId == null) throw new IllegalArgumentException("请先登录");
+        return ApiResponse.ok(complaintService.hasChatReported(userId, claimId, peerId));
+    }
+
+    public record CreateComplaintRequest(String targetType, Long itemId, Long claimId, Long messageId, @NotBlank String reason, String detail) {}
 }

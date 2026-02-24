@@ -66,7 +66,7 @@ Router.register('adminReview', function (app) {
         : list.map(item => {
           const imgs = item.imageUrls ? item.imageUrls.split(',').filter(Boolean) : [];
           return `
-            <div class="review-card">
+            <div class="review-card" data-review-item-id="${item.id}" style="cursor:pointer">
               <div class="info-line">物品名称：${esc(item.title)}</div>
               <div class="info-line">物品类型：${esc(item.category || '-')}</div>
               <div class="info-line">${item.type === 'LOST' ? '丢失' : '拾取'}地点：${esc(item.location || '-')}</div>
@@ -78,6 +78,7 @@ Router.register('adminReview', function (app) {
                 ${imgs.length > 0 ? imgs.slice(0, 3).map(u => imgTag(u, 140, 110)).join('') : '<div class="img-placeholder"></div><div class="img-placeholder"></div><div class="img-placeholder"></div>'}
               </div>
               <div class="review-actions">
+                <button class="btn-outline" data-open-detail="${item.id}">查看详情</button>
                 <button class="btn-outline" data-approve="${item.id}">通过</button>
                 <button class="btn-outline" data-reject="${item.id}">驳回</button>
               </div>
@@ -192,14 +193,33 @@ Router.register('adminReview', function (app) {
   }
 
   function bindReviewActions() {
+    const reviewList = document.getElementById('reviewList');
+    if (reviewList && !reviewList._detailDelegated) {
+      reviewList.addEventListener('click', (evt) => {
+        if (evt.target.closest('[data-open-detail],[data-approve],[data-reject]')) return;
+        const card = evt.target.closest('[data-review-item-id]');
+        if (card) Router.go('detail', { id: card.dataset.reviewItemId });
+      });
+      reviewList._detailDelegated = true;
+    }
+
+    document.querySelectorAll('[data-open-detail]').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        Router.go('detail', { id: btn.dataset.openDetail });
+      };
+    });
+
     document.querySelectorAll('[data-approve]').forEach(b => {
-      b.onclick = async () => {
+      b.onclick = async (e) => {
+        e.stopPropagation();
         try { await api(`/api/admin/items/${b.dataset.approve}/approve`, { method: 'PUT' }); load(); }
         catch (e) { alert(e.message); }
       };
     });
     document.querySelectorAll('[data-reject]').forEach(b => {
-      b.onclick = async () => {
+      b.onclick = async (e) => {
+        e.stopPropagation();
         const reason = prompt('请输入驳回原因（必填）:');
         if (!reason) return;
         try { await api(`/api/admin/items/${b.dataset.reject}/reject`, { method: 'PUT', body: JSON.stringify({ reason }) }); load(); }
@@ -254,7 +274,7 @@ Router.register('adminManage', function (app) {
         <select id="archiveMethodSelect" style="width:100%;padding:8px 12px;margin-bottom:8px;border:1px solid #ddd;border-radius:4px;font-size:14px">
           <option value="仅设置归档">仅设置归档</option>
           <option value="归档后删除">归档后删除</option>
-          <option value="归档后延时30天删除">归档后延时30天删除</option>
+          <option value="归档后延时删除" id="archiveDelayOption">归档后延时30天删除</option>
         </select>
         <div id="archiveError" style="color:#e74c3c;min-height:18px"></div>
         <div style="text-align:right;margin-top:10px">
@@ -263,9 +283,78 @@ Router.register('adminManage', function (app) {
         </div>
       </div>
     </div>
+    <div id="archiveGuardModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1002;align-items:center;justify-content:center">
+      <div style="background:#fff;padding:24px;border-radius:8px;min-width:420px;max-width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.15)">
+        <div style="font-size:30px;color:#333;text-align:center;margin:6px 0 30px;font-weight:bold">消息存在尚未超过规定天数，是否归档?</div>
+        <div style="display:flex;justify-content:space-between;gap:20px">
+          <button class="btn-sm" id="archiveGuardYes" style="flex:1;min-height:42px;font-size:24px;font-weight:bold">是</button>
+          <button class="btn-sm" id="archiveGuardNo" style="flex:1;min-height:42px;font-size:24px;font-weight:bold">否</button>
+        </div>
+      </div>
+    </div>
   `;
 
   let pg = 0;
+  let claimExpireDays = 30;
+  const itemMap = new Map();
+
+  function refreshArchiveDelayOptionText() {
+    const option = document.getElementById('archiveDelayOption');
+    if (!option) return;
+    option.textContent = `归档后延时${claimExpireDays}天删除`;
+  }
+
+  refreshArchiveDelayOptionText();
+
+  (async () => {
+    try {
+      const cfg = await getConfig();
+      if (cfg && cfg.claimExpireDays && Number(cfg.claimExpireDays) > 0) {
+        claimExpireDays = Number(cfg.claimExpireDays);
+        refreshArchiveDelayOptionText();
+      }
+    } catch (_) {}
+  })();
+
+  function daysSinceLastAction(item) {
+    const base = item?.updatedAt || item?.createdAt;
+    if (!base) return 0;
+    const ts = new Date(base).getTime();
+    if (Number.isNaN(ts)) return 0;
+    return Math.max(0, Math.floor((Date.now() - ts) / 86400000));
+  }
+
+  function openArchiveModal(itemId) {
+    const archiveModal = document.getElementById('archiveModal');
+    archiveModal._itemId = itemId;
+    refreshArchiveDelayOptionText();
+    document.getElementById('archiveMethodSelect').value = '仅设置归档';
+    document.getElementById('archiveError').textContent = '';
+    archiveModal.style.display = 'flex';
+  }
+
+  function openArchiveGuardModal(itemId) {
+    const guard = document.getElementById('archiveGuardModal');
+    guard._itemId = itemId;
+    guard.style.display = 'flex';
+  }
+
+  function closeArchiveGuardModal() {
+    const guard = document.getElementById('archiveGuardModal');
+    guard._itemId = null;
+    guard.style.display = 'none';
+  }
+
+  function startArchiveFlow(itemId) {
+    const item = itemMap.get(String(itemId));
+    const daysSince = daysSinceLastAction(item);
+    if (daysSince < claimExpireDays) {
+      openArchiveGuardModal(itemId);
+      return;
+    }
+    openArchiveModal(itemId);
+  }
+
   fillCategorySelect('mCat');
   async function load() {
     const type = document.getElementById('mType').value;
@@ -277,12 +366,14 @@ Router.register('adminManage', function (app) {
       const data = await api(`/api/admin/items?keyword=${encodeURIComponent(kw)}&type=${type}&category=${encodeURIComponent(cat)}&location=${encodeURIComponent(loc)}&status=${status}&page=${pg}&size=8`);
       const page = data.data;
       const list = page.content || [];
+      itemMap.clear();
+      list.forEach(item => itemMap.set(String(item.id), item));
       document.getElementById('manageList').innerHTML = list.length === 0
         ? '<p class="empty">暂无数据</p>'
         : list.map(item => {
           const imgs = item.imageUrls ? item.imageUrls.split(',').filter(Boolean) : [];
           const isLost = item.type === 'LOST';
-          const daysSince = item.createdAt ? Math.floor((Date.now() - new Date(item.createdAt).getTime()) / 86400000) : 0;
+          const daysSince = daysSinceLastAction(item);
           return `
             <div class="manage-card">
               <div class="item-card-row" style="border:none;padding:0;margin:0;cursor:default">
@@ -302,9 +393,9 @@ Router.register('adminManage', function (app) {
                 </div>
               </div>
               <div class="days-info">
-                <div>该物品距离发出信息已有 <b>${daysSince}</b> 天</div>
+                <div>该物品距离最近操作已有 <b>${daysSince}</b> 天</div>
                 <div>目前进行到 <b>${statusLabel(item.status)}</b> 阶段</div>
-                ${daysSince >= 30 && item.status !== 'CANCELLED' ? '<div style="color:#e74c3c">该物品距离发出信息已有 ' + daysSince + ' 天，符合归档标准！</div>' : ''}
+                ${daysSince >= claimExpireDays && item.status !== 'CANCELLED' ? '<div style="color:#e74c3c">该物品距离最近操作已有 ' + daysSince + ' 天，符合归档标准！</div>' : ''}
               </div>
               <div class="manage-actions">
                 ${item.status === 'CANCELLED' ? '<span style="color:#888;font-size:13px">已取消，无法管理</span>' : `<button class="btn-sm" data-mstatus="${item.id}">更改状态</button>`}
@@ -342,11 +433,7 @@ Router.register('adminManage', function (app) {
     const newStatus = document.getElementById('statusModalSelect').value;
     if (newStatus === 'ARCHIVED') {
       modal.style.display = 'none';
-      const archiveModal = document.getElementById('archiveModal');
-      archiveModal._itemId = itemId;
-      document.getElementById('archiveMethodSelect').value = '仅设置归档';
-      document.getElementById('archiveError').textContent = '';
-      archiveModal.style.display = 'flex';
+      startArchiveFlow(itemId);
       return;
     }
     try {
@@ -385,6 +472,19 @@ Router.register('adminManage', function (app) {
   };
   document.getElementById('archiveModal').addEventListener('click', function (e) {
     if (e.target === this) this.style.display = 'none';
+  });
+
+  document.getElementById('archiveGuardYes').onclick = () => {
+    const guard = document.getElementById('archiveGuardModal');
+    const itemId = guard._itemId;
+    closeArchiveGuardModal();
+    if (itemId) openArchiveModal(itemId);
+  };
+  document.getElementById('archiveGuardNo').onclick = () => {
+    closeArchiveGuardModal();
+  };
+  document.getElementById('archiveGuardModal').addEventListener('click', function (e) {
+    if (e.target === this) closeArchiveGuardModal();
   });
 
   load();

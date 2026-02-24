@@ -19,6 +19,10 @@ public class ChatMessage {
     @JoinColumn(name = "sender_id", nullable = false)
     private User sender;
 
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "receiver_id")
+    private User receiver;
+
     @Column(nullable = false, length = 1000)
     private String content;
 
@@ -30,6 +34,8 @@ public class ChatMessage {
     public void setClaim(ClaimRecord claim) { this.claim = claim; }
     public User getSender() { return sender; }
     public void setSender(User sender) { this.sender = sender; }
+    public User getReceiver() { return receiver; }
+    public void setReceiver(User receiver) { this.receiver = receiver; }
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
     public LocalDateTime getCreatedAt() { return createdAt; }

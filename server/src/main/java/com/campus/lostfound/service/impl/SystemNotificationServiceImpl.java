@@ -5,6 +5,7 @@ import com.campus.lostfound.model.User;
 import com.campus.lostfound.repository.SystemNotificationRepository;
 import com.campus.lostfound.repository.UserRepository;
 import com.campus.lostfound.service.SystemNotificationService;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -47,6 +48,6 @@ public class SystemNotificationServiceImpl implements SystemNotificationService 
 
     @Override
     public List<SystemNotification> listForUser(Long userId) {
-        return systemNotificationRepository.findForUser(userId);
+        return systemNotificationRepository.findForUser(userId, PageRequest.of(0, 8));
     }
 }

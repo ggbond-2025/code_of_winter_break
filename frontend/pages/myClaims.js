@@ -1,3 +1,5 @@
+let chatPollingTimer = null;
+
 Router.register('myChat', async function (app) {
   const role = Auth.getRole();
   let layoutRole = 'USER';
@@ -5,6 +7,11 @@ Router.register('myChat', async function (app) {
   if (role === 'ADMIN') { layoutRole = 'ADMIN'; activeNav = 'adminChat'; }
   else if (role === 'SUPER_ADMIN') { layoutRole = 'SUPER_ADMIN'; activeNav = 'superChat'; }
   const main = renderLayout(app, layoutRole, activeNav);
+  if (chatPollingTimer) {
+    clearInterval(chatPollingTimer);
+    chatPollingTimer = null;
+    window.__lfChatPollTimer = null;
+  }
   main.innerHTML = '<p>加载中...</p>';
   let pg = 0;
   async function load() {
@@ -18,20 +25,20 @@ Router.register('myChat', async function (app) {
       }
 
       const myId = Auth.getUserId();
-      let contactCount = 0;
+      const contactKeys = new Set();
       for (const g of groups) {
         const item = g.item || {};
         const owner = item.creator;
         for (const claim of g.claims || []) {
-          if (owner && String(owner.id) !== myId) contactCount += 1;
-          if (claim.claimer && String(claim.claimer.id) !== myId) contactCount += 1;
-          if (claim.reviewer && String(claim.reviewer.id) !== myId) contactCount += 1;
+          if (owner && String(owner.id) !== myId) contactKeys.add(`${claim.id}-${owner.id}`);
+          if (claim.claimer && String(claim.claimer.id) !== myId) contactKeys.add(`${claim.id}-${claim.claimer.id}`);
+          if (claim.reviewer && String(claim.reviewer.id) !== myId) contactKeys.add(`${claim.id}-${claim.reviewer.id}`);
         }
       }
       main.innerHTML = `
         <div style="padding:20px">
           <div style="background:#fff3cd;border:1px solid #ffc107;padding:12px;margin-bottom:20px;border-radius:4px">
-            <b style="color:#e74c3c">系统消息：</b> 你有 ${contactCount} 条已匹配的聊天记录
+            <b style="color:#e74c3c">系统消息：</b> 你有 ${contactKeys.size} 条已匹配的聊天记录
           </div>
           <div id="chatList"></div>
           <div id="chatPager" class="pager"></div>
@@ -69,30 +76,19 @@ Router.register('myChat', async function (app) {
         for (const claim of claims) {
           const claimer = claim.claimer;
           const reviewer = claim.reviewer;
-          let lastMsg = '';
-          let lastTime = '';
-          try {
-            const msgData = await api(`/api/claims/${claim.id}/messages`);
-            const msgs = msgData.data || [];
-            if (msgs.length > 0) {
-              const last = msgs[msgs.length - 1];
-              lastMsg = last.content || '';
-              lastTime = fmtTime(last.createdAt);
-            }
-          } catch (_) {}
-
           const users = [];
           if (owner && String(owner.id) !== myId) users.push({ label: '发布人', user: owner, type: 'owner' });
           if (claimer && String(claimer.id) !== myId) users.push({ label: isLost ? '归还人' : '认领人', user: claimer, type: 'claimer' });
           if (reviewer && String(reviewer.id) !== myId) users.push({ label: '审核管理员', user: reviewer, type: 'reviewer' });
           for (const u of users) {
+            if (!u.user || !u.user.id) continue;
             contactRows.push(`
-              <div style="padding:8px 16px 12px;border-top:1px solid #eee;cursor:pointer" class="chat-card" data-claim-id="${claim.id}">
+              <div style="padding:8px 16px 12px;border-top:1px solid #eee;cursor:pointer" class="chat-card" data-claim-id="${claim.id}" data-peer-id="${u.user.id}">
                 <div style="display:flex;align-items:center;gap:10px">
                   <div style="width:32px;height:32px;border-radius:50%;background:${u.type === 'reviewer' ? '#b0c4de' : '#ddd'};display:flex;align-items:center;justify-content:center;font-size:14px">&#128100;</div>
                   <div style="flex:1">
-                    <div><b>${esc(u.label)}：${esc(u.user?.username || '-')}</b> ${lastTime ? '<span style="float:right;color:#999;font-size:12px">' + lastTime + '</span>' : ''}</div>
-                    ${lastMsg ? `<div style="color:#666;font-size:13px;margin-top:2px">${esc(lastMsg.length > 40 ? lastMsg.substring(0, 40) + '...' : lastMsg)}</div>` : '<div style="color:#999;font-size:13px">暂无消息</div>'}
+                    <div><b>${esc(u.label)}：${esc(u.user?.username || '-')}</b></div>
+                    <div style="color:#999;font-size:13px">点击进入会话</div>
                   </div>
                 </div>
               </div>
@@ -110,7 +106,7 @@ Router.register('myChat', async function (app) {
       }
 
       document.querySelectorAll('.chat-card[data-claim-id]').forEach(card => {
-        card.onclick = () => Router.go('chatDetail', { claimId: card.dataset.claimId });
+        card.onclick = () => Router.go('chatDetail', { claimId: card.dataset.claimId, peerId: card.dataset.peerId });
       });
       renderPager(document.getElementById('chatPager'), pg, page.totalPages || 1, p => { pg = p; load(); });
     } catch (e) {
@@ -188,18 +184,31 @@ Router.register('chatDetail', async function (app, params) {
   if (role === 'ADMIN') { layoutRole = 'ADMIN'; activeNav = 'adminChat'; }
   else if (role === 'SUPER_ADMIN') { layoutRole = 'SUPER_ADMIN'; activeNav = 'superChat'; }
   const main = renderLayout(app, layoutRole, activeNav);
+  if (chatPollingTimer) {
+    clearInterval(chatPollingTimer);
+    chatPollingTimer = null;
+    window.__lfChatPollTimer = null;
+  }
   main.innerHTML = '<p>加载中...</p>';
 
   const claimId = params.claimId;
+  const peerId = params.peerId;
   const myId = Auth.getUserId();
 
+  if (!claimId || !peerId) {
+    main.innerHTML = '<p class="msg msg-err">会话参数不完整，请返回聊天列表重试</p>';
+    return;
+  }
+
   try {
-    const [msgData, claimData] = await Promise.all([
-      api(`/api/claims/${claimId}/messages`),
-      api(`/api/claims/${claimId}`)
+    const [msgData, claimData, reportData] = await Promise.all([
+      api(`/api/claims/${claimId}/messages?peerId=${encodeURIComponent(peerId)}`),
+      api(`/api/claims/${claimId}`),
+      api(`/api/complaints/chat/reported?claimId=${encodeURIComponent(claimId)}&peerId=${encodeURIComponent(peerId)}`)
     ]);
     const messages = msgData.data || [];
     const claim = claimData.data || {};
+    const hasReportedChat = !!reportData.data;
     const item = claim.item || {};
     const owner = item.creator;
     const claimer = claim.claimer;
@@ -218,6 +227,7 @@ Router.register('chatDetail', async function (app, params) {
           <div style="margin-bottom:4px"><b>物品：</b>${esc(item.title || '-')}</div>
           <div>${partLine}</div>
         </div>
+        ${hasReportedChat ? '<div style="margin-bottom:8px;padding:8px 12px;background:#fff3cd;border:1px solid #ffc107;border-radius:4px;color:#8a6d3b">聊天被举报，请规范发言</div>' : ''}
         <div id="chatMessages" style="flex:1;overflow-y:auto;border:1px solid #ddd;padding:12px;background:#fafafa;margin-bottom:12px"></div>
         <div style="display:flex;gap:8px">
           <input id="chatInput" style="flex:1;padding:10px;border:1px solid #ccc;border-radius:4px;font-size:14px" placeholder="输入消息..." />
@@ -242,11 +252,34 @@ Router.register('chatDetail', async function (app, params) {
             <div style="max-width:70%;margin:0 8px">
               <div style="font-size:12px;color:#999;${isMine ? 'text-align:right' : ''}">${esc(m.sender?.username || '-')} <span style="margin-left:8px">${fmtTime(m.createdAt)}</span></div>
               <div style="background:${isMine ? '#dcf8c6' : '#fff'};border:1px solid #ddd;padding:8px 12px;border-radius:8px;margin-top:2px;word-break:break-all">${esc(m.content)}</div>
+              ${!isMine ? `<div style="margin-top:4px;${isMine ? 'text-align:right' : ''}"><button class="btn-sm btn-outline" data-chat-report="${m.id}">举报发言</button></div>` : ''}
             </div>
           </div>
         `;
       }).join('');
       box.scrollTop = box.scrollHeight;
+
+      box.querySelectorAll('[data-chat-report]').forEach(btn => {
+        btn.onclick = async () => {
+          const reason = prompt('请选择/输入举报原因：辱骂攻击、骚扰、虚假信息、其他');
+          if (reason === null) return;
+          const detail = prompt('请填写具体说明（可选）：') || '';
+          try {
+            await api('/api/complaints', {
+              method: 'POST',
+              body: JSON.stringify({
+                targetType: 'CHAT_MESSAGE',
+                messageId: Number(btn.dataset.chatReport),
+                reason: reason.trim() || '其他',
+                detail: detail.trim()
+              })
+            });
+            alert('投诉已提交，等待超级管理员审核');
+          } catch (e) {
+            alert(e.message);
+          }
+        };
+      });
     }
 
     renderMessages(messages);
@@ -258,10 +291,10 @@ Router.register('chatDetail', async function (app, params) {
       try {
         await api(`/api/claims/${claimId}/messages`, {
           method: 'POST',
-          body: JSON.stringify({ content })
+          body: JSON.stringify({ peerId: Number(peerId), content })
         });
         input.value = '';
-        const refreshed = await api(`/api/claims/${claimId}/messages`);
+        const refreshed = await api(`/api/claims/${claimId}/messages?peerId=${encodeURIComponent(peerId)}`);
         renderMessages(refreshed.data || []);
       } catch (e) { alert(e.message); }
     };
@@ -270,12 +303,13 @@ Router.register('chatDetail', async function (app, params) {
       if (e.key === 'Enter') document.getElementById('chatSendBtn').click();
     };
 
-    setInterval(async () => {
+    chatPollingTimer = setInterval(async () => {
       try {
-        const refreshed = await api(`/api/claims/${claimId}/messages`);
+        const refreshed = await api(`/api/claims/${claimId}/messages?peerId=${encodeURIComponent(peerId)}`);
         renderMessages(refreshed.data || []);
       } catch (_) {}
     }, 5000);
+    window.__lfChatPollTimer = chatPollingTimer;
   } catch (e) {
     main.innerHTML = `<p class="msg msg-err">${e.message}</p>`;
   }

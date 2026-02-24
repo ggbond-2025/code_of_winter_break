@@ -25,7 +25,7 @@ public interface ClaimService {
 
     List<ClaimRecord> adminHistoryClaims(String location, String keyword, Integer days);
 
-    ChatMessage sendMessage(Long userId, Long claimId, String content);
+    ChatMessage sendMessage(Long userId, Long claimId, Long peerId, String content);
 
-    List<ChatMessage> getMessages(Long userId, Long claimId);
+    List<ChatMessage> getMessages(Long userId, Long claimId, Long peerId);
 }

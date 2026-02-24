@@ -61,6 +61,8 @@ public interface LostItemRepository extends JpaRepository<LostItem, Long> {
 
     List<LostItem> findByStatusAndUpdatedAtBefore(String status, LocalDateTime time);
 
+       List<LostItem> findByStatusInAndUpdatedAtBefore(List<String> statuses, LocalDateTime time);
+
     Page<LostItem> findByCreatorIdOrderByCreatedAtDesc(Long creatorId, Pageable pageable);
 
     List<LostItem> findAllByCreatorIdOrderByCreatedAtDesc(Long creatorId);

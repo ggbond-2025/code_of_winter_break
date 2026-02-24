@@ -144,7 +144,15 @@ body { font-family: 'Microsoft YaHei', Arial, sans-serif; background: #fff; colo
 .complaint-images img, .complaint-images .img-placeholder { width: 120px; height: 90px; object-fit: cover; border: 1px solid #ddd; background: #e8e8e8; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 12px; }
 .complaint-actions { display: flex; gap: 60px; justify-content: center; margin-top: 12px; }
 .notify-card { border: 1px solid #ddd; padding: 16px 20px; margin-bottom: 12px; }
+.notify-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.notify-type { font-size: 14px; font-weight: 700; }
+.notify-state { font-size: 12px; border: 1px solid #ccc; padding: 2px 8px; border-radius: 12px; }
+.notify-state.is-pending { border-color: #f0ad4e; color: #b97500; }
+.notify-state.is-submitted { border-color: #5bc0de; color: #2f8da6; }
+.notify-state.is-resolved { border-color: #5cb85c; color: #2d8a2d; }
+.notify-state.is-rejected { border-color: #d9534f; color: #b23b37; }
 .notify-content { font-size: 14px; line-height: 1.8; }
+.notify-line { margin-bottom: 2px; }
 .notify-time { font-size: 12px; color: #888; text-align: right; margin-top: 8px; }
 .param-card { border: 1px solid #ddd; padding: 16px 20px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
 .param-left { max-width: 70%; }

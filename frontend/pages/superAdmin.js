@@ -841,10 +841,16 @@ Router.register('superMessages', function (app) {
             const isLost = item.type === 'LOST';
             const locLabel = isLost ? '丢失地点' : '拾取地点';
             const timeLabel = isLost ? '丢失时间' : '拾得时间';
+            const complaintType = c.complaintType || 'ITEM_POST';
+            let complaintTypeLabel = '帖子投诉';
+            if (complaintType === 'ITEM_POST') complaintTypeLabel = isLost ? '寻物启事投诉' : '失物招领投诉';
+            else if (complaintType === 'CLAIM_APPLICATION') complaintTypeLabel = '申请投诉';
+            else if (complaintType === 'CHAT_MESSAGE') complaintTypeLabel = '聊天投诉';
             return `
               <div class="complaint-card">
                 <div class="complaint-main">
                   <div class="complaint-info">
+                    <div><b>投诉对象类型：</b>${esc(complaintTypeLabel)}</div>
                     <div><b>物品名称：</b>${esc(item.title || '-')}</div>
                     <div><b>物品类型：</b>${esc(item.category || '-')}</div>
                     <div><b>${locLabel}：</b>${esc(item.location || '-')}</div>

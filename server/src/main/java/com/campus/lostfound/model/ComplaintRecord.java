@@ -23,6 +23,17 @@ public class ComplaintRecord {
     @JoinColumn(name = "target_id", nullable = false)
     private User target;
 
+    @Column(nullable = false, length = 30)
+    private String complaintType = "ITEM_POST";
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "claim_id")
+    private ClaimRecord claim;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "chat_message_id")
+    private ChatMessage chatMessage;
+
     @Column(nullable = false, length = 60)
     private String reason;
 
@@ -57,6 +68,12 @@ public class ComplaintRecord {
     public void setReporter(User reporter) { this.reporter = reporter; }
     public User getTarget() { return target; }
     public void setTarget(User target) { this.target = target; }
+    public String getComplaintType() { return complaintType; }
+    public void setComplaintType(String complaintType) { this.complaintType = complaintType; }
+    public ClaimRecord getClaim() { return claim; }
+    public void setClaim(ClaimRecord claim) { this.claim = claim; }
+    public ChatMessage getChatMessage() { return chatMessage; }
+    public void setChatMessage(ChatMessage chatMessage) { this.chatMessage = chatMessage; }
     public String getReason() { return reason; }
     public void setReason(String reason) { this.reason = reason; }
     public String getDetail() { return detail; }

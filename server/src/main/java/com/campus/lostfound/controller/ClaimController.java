@@ -124,19 +124,21 @@ public class ClaimController {
     @PostMapping("/{claimId}/messages")
     public ApiResponse<ChatMessage> sendMessage(@PathVariable Long claimId, @RequestBody SendMessageRequest req, HttpServletRequest servletRequest) {
         Long userId = (Long) servletRequest.getAttribute("loginUserId");
-        return ApiResponse.ok(claimService.sendMessage(userId, claimId, req.content()));
+        return ApiResponse.ok(claimService.sendMessage(userId, claimId, req.peerId(), req.content()));
     }
 
     @GetMapping("/{claimId}/messages")
-    public ApiResponse<List<ChatMessage>> getMessages(@PathVariable Long claimId, HttpServletRequest servletRequest) {
+    public ApiResponse<List<ChatMessage>> getMessages(@PathVariable Long claimId,
+                                                      @RequestParam Long peerId,
+                                                      HttpServletRequest servletRequest) {
         Long userId = (Long) servletRequest.getAttribute("loginUserId");
-        return ApiResponse.ok(claimService.getMessages(userId, claimId));
+        return ApiResponse.ok(claimService.getMessages(userId, claimId, peerId));
     }
 
     public record CreateClaimRequest(Long itemId, @NotBlank(message = "留言不能为空") String message, String proof, String imageUrls) {}
     public record ClaimCreateResult(Long id, String status) {}
     public record ReviewRequest(@NotBlank(message = "审核状态不能为空") String status, String reason) {}
-    public record SendMessageRequest(@NotBlank(message = "消息不能为空") String content) {}
+    public record SendMessageRequest(Long peerId, @NotBlank(message = "消息不能为空") String content) {}
     public record ChatGroup(LostItem item, List<ClaimRecord> claims) {}
     public record MyClaimProgress(Long claimId, String claimStatus, String progressStatus, LostItem item) {}
 }

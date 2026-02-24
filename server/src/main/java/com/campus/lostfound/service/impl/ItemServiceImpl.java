@@ -7,6 +7,7 @@ import com.campus.lostfound.repository.LostItemRepository;
 import com.campus.lostfound.repository.UserRepository;
 import com.campus.lostfound.service.ItemService;
 import com.campus.lostfound.service.SystemConfigService;
+import com.campus.lostfound.service.SystemNotificationService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -19,11 +20,16 @@ public class ItemServiceImpl implements ItemService {
     private final LostItemRepository lostItemRepository;
     private final UserRepository userRepository;
     private final SystemConfigService systemConfigService;
+    private final SystemNotificationService systemNotificationService;
 
-    public ItemServiceImpl(LostItemRepository lostItemRepository, UserRepository userRepository, SystemConfigService systemConfigService) {
+    public ItemServiceImpl(LostItemRepository lostItemRepository,
+                           UserRepository userRepository,
+                           SystemConfigService systemConfigService,
+                           SystemNotificationService systemNotificationService) {
         this.lostItemRepository = lostItemRepository;
         this.userRepository = userRepository;
         this.systemConfigService = systemConfigService;
+        this.systemNotificationService = systemNotificationService;
     }
 
     @Override
@@ -85,7 +91,13 @@ public class ItemServiceImpl implements ItemService {
         item.setStorageLocation(storageLocation);
         item.setCreator(user);
 
-        return lostItemRepository.save(item);
+        LostItem saved = lostItemRepository.save(item);
+        sendBizNotice(userId,
+            postNoticeObject(saved),
+            "发布成功",
+            safeStatus(saved.getStatus()),
+            "你发布的帖子已提交成功");
+        return saved;
     }
 
     @Override
@@ -121,6 +133,7 @@ public class ItemServiceImpl implements ItemService {
                            String imageUrls, Double reward, String storageLocation) {
         LostItem item = lostItemRepository.findById(itemId)
                 .orElseThrow(() -> new IllegalArgumentException("物品不存在"));
+        String oldStatus = item.getStatus();
         if (!item.getCreator().getId().equals(userId)) {
             throw new IllegalArgumentException("只能修改自己的发布");
         }
@@ -148,7 +161,9 @@ public class ItemServiceImpl implements ItemService {
             item.setStatus("PENDING");
         }
 
-        return lostItemRepository.save(item);
+        LostItem saved = lostItemRepository.save(item);
+        notifyPostStatusChanged(saved, oldStatus, saved.getStatus(), "你已修改帖子");
+        return saved;
     }
 
     @Override
@@ -158,8 +173,10 @@ public class ItemServiceImpl implements ItemService {
         if (!item.getCreator().getId().equals(userId)) {
             throw new IllegalArgumentException("只能取消自己的发布");
         }
+        String oldStatus = item.getStatus();
         item.setStatus("CANCELLED");
-        lostItemRepository.save(item);
+        LostItem saved = lostItemRepository.save(item);
+        notifyPostStatusChanged(saved, oldStatus, saved.getStatus(), "你已取消发布该帖子");
     }
 
     @Override
@@ -172,6 +189,69 @@ public class ItemServiceImpl implements ItemService {
         if (!"PENDING".equals(item.getStatus()) && !"REJECTED".equals(item.getStatus())) {
             throw new IllegalArgumentException("只有待审核或已驳回的记录可以删除");
         }
+        sendBizNotice(userId,
+            postNoticeObject(item),
+            "删除帖子",
+            "已删除",
+            "你已删除该帖子");
         lostItemRepository.delete(item);
+    }
+
+    private void notifyPostStatusChanged(LostItem item, String oldStatus, String newStatus, String extra) {
+        if (item == null || item.getCreator() == null || newStatus == null || newStatus.equals(oldStatus)) return;
+        String detail = (extra == null || extra.isBlank())
+            ? String.format("状态由 %s 变更为 %s", safeStatus(oldStatus), safeStatus(newStatus))
+            : String.format("状态由 %s 变更为 %s；%s", safeStatus(oldStatus), safeStatus(newStatus), extra);
+        sendBizNotice(item.getCreator().getId(),
+            postNoticeObject(item),
+            "状态变更",
+            safeStatus(newStatus),
+            detail);
+    }
+
+    private void sendUserNotice(Long userId, String content) {
+        if (userId == null || content == null || content.isBlank()) return;
+        systemNotificationService.send(userId, userId, "USER", content);
+    }
+
+    private void sendBizNotice(Long userId, String object, String event, String state, String detail) {
+        sendUserNotice(userId,
+                String.format("【系统通知】对象：%s；事件：%s；状态：%s；说明：%s。",
+                        safeText(object), safeText(event), safeText(state), safeText(detail)));
+    }
+
+    private String safeTitle(LostItem item) {
+        return item == null || item.getTitle() == null || item.getTitle().isBlank() ? "未命名帖子" : item.getTitle();
+    }
+
+    private String postNoticeObject(LostItem item) {
+        String id = item != null && item.getId() != null ? String.valueOf(item.getId()) : "0";
+        return postTypeLabel(item) + "《" + safeTitle(item) + "》#" + id;
+    }
+
+    private String postTypeLabel(LostItem item) {
+        return item != null && "LOST".equals(item.getType()) ? "寻物启事" : "失物招领";
+    }
+
+    private String safeStatus(String status) {
+        if (status == null || status.isBlank()) return "未知状态";
+        return switch (status) {
+            case "PENDING" -> "待审核";
+            case "ADMIN_APPROVED" -> "待发布者审核";
+            case "CLAIM_ADMIN_REVIEW" -> "管理员审核申请中";
+            case "CLAIM_OWNER_REVIEW" -> "发布人审核申请中";
+            case "APPROVED" -> "未匹配";
+            case "REJECTED" -> "已驳回";
+            case "MATCHED" -> "已匹配";
+            case "CLAIMED" -> "已认领";
+            case "ARCHIVED" -> "已归档";
+            case "CANCELLED" -> "已取消";
+            case "ADMIN_DELETED" -> "管理员删除";
+            default -> status;
+        };
+    }
+
+    private String safeText(String text) {
+        return text == null || text.isBlank() ? "无" : text;
     }
 }

@@ -2,23 +2,68 @@ Router.register('home', async function (app) {
   const main = renderLayout(app, 'USER', 'home');
   main.innerHTML = `
     <h2 style="text-align:center;margin:20px 0 30px"><b>${esc(Auth.getUser())}，欢迎登录失物招领系统</b></h2>
-    <h3 style="margin-bottom:16px"><b>我发布的帖子：</b></h3>
+    <h3 style="margin-bottom:16px"><b>目前进度：</b></h3>
     <div id="myPostList"></div>
     <div id="myPostPager" class="pager"></div>
   `;
 
   let pg = 0;
+  const pageSize = 8;
+  const hiddenStatuses = new Set(['APPROVED', 'CLAIMED', 'ARCHIVED']);
+
+  async function fetchAllPages(pathBuilder) {
+    let current = 0;
+    let totalPages = 1;
+    const all = [];
+    while (current < totalPages) {
+      const data = await api(pathBuilder(current, 50));
+      const page = data.data || {};
+      all.push(...(page.content || []));
+      totalPages = page.totalPages || 1;
+      current += 1;
+    }
+    return all;
+  }
+
   async function load() {
     try {
-      const data = await api(`/api/items/my?page=${pg}&size=8`);
-      const page = data.data || {};
-      const list = page.content || [];
-      if (list.length === 0) {
-        document.getElementById('myPostList').innerHTML = '<p class="empty">暂无发布记录</p>';
+      const [myItems, myApplications] = await Promise.all([
+        fetchAllPages((page, size) => `/api/items/my?page=${page}&size=${size}`),
+        fetchAllPages((page, size) => `/api/claims/my/applications?page=${page}&size=${size}`)
+      ]);
+
+      const ownEntries = myItems
+        .filter(item => item && !hiddenStatuses.has(item.status))
+        .map(item => ({
+          item,
+          source: 'PUBLISHED',
+          sortAt: item.updatedAt || item.createdAt || ''
+        }));
+
+      const applyMap = new Map();
+      for (const claim of myApplications) {
+        const item = claim?.item;
+        if (!item || hiddenStatuses.has(item.status) || applyMap.has(item.id)) continue;
+        applyMap.set(item.id, {
+          item,
+          source: 'APPLIED',
+          sortAt: claim.updatedAt || claim.createdAt || item.updatedAt || item.createdAt || ''
+        });
+      }
+      const all = [...ownEntries, ...Array.from(applyMap.values())]
+        .sort((a, b) => new Date(b.sortAt).getTime() - new Date(a.sortAt).getTime());
+
+      if (all.length === 0) {
+        document.getElementById('myPostList').innerHTML = '<p class="empty">暂无进度记录</p>';
         document.getElementById('myPostPager').innerHTML = '';
         return;
       }
-      document.getElementById('myPostList').innerHTML = list.map(item => {
+      const totalPages = Math.max(1, Math.ceil(all.length / pageSize));
+      const from = pg * pageSize;
+      const pageList = all.slice(from, from + pageSize);
+
+      document.getElementById('myPostList').innerHTML = pageList.map(entry => {
+        const item = entry.item;
         const imgs = item.imageUrls ? item.imageUrls.split(',').filter(Boolean) : [];
         const isLost = item.type === 'LOST';
         return `
@@ -26,6 +71,7 @@ Router.register('home', async function (app) {
             <div class="card-left">
               <div class="item-status">目前进度：${statusLabel(item.status)}</div>
               <div class="item-info">
+                <div style="color:#666">来源：${entry.source === 'PUBLISHED' ? '我发布的帖子' : '我提交申请的帖子'}</div>
                 <div>物品名称：${esc(item.title || '-')}</div>
                 <div>物品类型：${esc(item.category || '-')}</div>
                 <div>${isLost ? '丢失' : '拾取'}地点：${esc(item.location || '-')}</div>
@@ -43,11 +89,16 @@ Router.register('home', async function (app) {
         `;
       }).join('');
       document.querySelectorAll('#myPostList .item-card-row[data-id]').forEach(c => {
-        c.onclick = () => Router.go('detail', { id: c.dataset.id });
+        c.onclick = () => {
+          sessionStorage.removeItem('lf_detail_from');
+          sessionStorage.removeItem('lf_detail_from_item');
+          sessionStorage.removeItem('lf_claim_back_route');
+          Router.go('detail', { id: c.dataset.id });
+        };
       });
-      renderPager(document.getElementById('myPostPager'), pg, page.totalPages || 1, p => { pg = p; load(); });
+      renderPager(document.getElementById('myPostPager'), pg, totalPages, p => { pg = p; load(); });
     } catch (e) {
-      document.getElementById('myPostList').innerHTML = '<p class="empty">暂无发布记录</p>';
+      document.getElementById('myPostList').innerHTML = '<p class="empty">暂无进度记录</p>';
       document.getElementById('myPostPager').innerHTML = '';
     }
   }
@@ -135,7 +186,12 @@ Router.register('search', function (app) {
           </div>
         `).join('');
       document.querySelectorAll('.item-card-row[data-id]').forEach(c => {
-        c.onclick = () => Router.go('detail', { id: c.dataset.id });
+        c.onclick = () => {
+          sessionStorage.setItem('lf_detail_from', 'search');
+          sessionStorage.setItem('lf_detail_from_item', String(c.dataset.id));
+          sessionStorage.setItem('lf_claim_back_route', 'search');
+          Router.go('detail', { id: c.dataset.id });
+        };
       });
       document.querySelectorAll('[data-report]').forEach(b => {
         b.onclick = (e) => {
@@ -167,18 +223,183 @@ Router.register('list', function (app) {
 
 Router.register('sysNotify', async function (app) {
   const main = renderLayout(app, 'USER', 'sysNotify');
-  main.innerHTML = '<div id="sysNotifyList"></div>';
+  main.innerHTML = `
+    <div class="filter-bar">
+      <label>消息类型</label>
+      <select id="nType">
+        <option value="">所有</option>
+        <option value="归还申请">归还申请</option>
+        <option value="认领申请">认领申请</option>
+        <option value="失物招领">失物招领</option>
+        <option value="寻物启事">寻物启事</option>
+        <option value="举报">举报</option>
+      </select>
+      <label>时间范围</label>
+      <select id="nTime">
+        <option value="">所有</option>
+        <option value="7">近7天</option>
+        <option value="30">近30天</option>
+        <option value="90">近90天</option>
+      </select>
+    </div>
+    <div id="sysNotifyList"></div>
+  `;
+
+  const STATUS_MAP = {
+    PENDING: '待审核',
+    ADMIN_APPROVED: '管理员已通过',
+    CLAIM_ADMIN_REVIEW: '管理员审核申请中',
+    CLAIM_OWNER_REVIEW: '发布人审核申请中',
+    APPROVED: '未匹配',
+    REJECTED: '已驳回',
+    MATCHED: '已匹配',
+    CLAIMED: '已认领',
+    ARCHIVED: '已归档',
+    CANCELLED: '已取消',
+    ADMIN_DELETED: '管理员删除',
+    RESOLVED: '已处理'
+  };
+
+  function normalizeStatusText(text) {
+    return String(text || '').replace(/\b(PENDING|ADMIN_APPROVED|CLAIM_ADMIN_REVIEW|CLAIM_OWNER_REVIEW|APPROVED|REJECTED|MATCHED|CLAIMED|ARCHIVED|CANCELLED|ADMIN_DELETED|RESOLVED)\b/g, s => STATUS_MAP[s] || s);
+  }
+
+  function parseNotify(raw) {
+    const normalized = normalizeStatusText(raw);
+    const objectMatch = normalized.match(/对象：([^；。]+)/);
+    const eventMatch = normalized.match(/事件：([^；。]+)/);
+    const detailMatch = normalized.match(/说明：([^。]+)/);
+    const object = objectMatch ? objectMatch[1].trim() : '';
+    let event = eventMatch ? eventMatch[1].trim() : '系统事件';
+    let detail = detailMatch ? detailMatch[1].trim() : normalized.replace(/^【[^】]+】/, '').trim();
+    if (event === '帖子状态跟踪') {
+      event = '状态变更';
+    }
+    if (detail.startsWith('你申请过的帖子状态由')) {
+      detail = detail.replace('你申请过的帖子状态由', '状态由');
+    }
+
+    const postMatch = object.match(/(失物招领|寻物启事)《([^》]+)》#?(\d+)?/);
+    const claimMatch = object.match(/(认领申请|归还申请)《([^》]+)》#?(\d+)?/);
+    const chatMatch = object.match(/聊天消息#?(\d+)?/);
+    const isReport = event.includes('举报');
+
+    let type = '失物招领';
+    if (isReport) {
+      type = '举报';
+    } else if (claimMatch) {
+      type = claimMatch[1] || '认领申请';
+    } else if (postMatch) {
+      type = postMatch[1];
+    } else if (event.includes('申请')) {
+      type = '认领申请';
+    }
+
+    const itemName = postMatch ? postMatch[2] : (claimMatch ? claimMatch[2] : '');
+    const itemId = postMatch && postMatch[3] ? Number(postMatch[3])
+      : (claimMatch && claimMatch[3] ? Number(claimMatch[3]) : null);
+    const chatClaimId = chatMatch && chatMatch[1] ? Number(chatMatch[1]) : null;
+
+    let reportTargetType = '';
+    if (type === '举报') {
+      if (object.includes('聊天消息')) reportTargetType = '聊天消息';
+      else if (object.includes('认领申请') || object.includes('归还申请') || object.includes('申请')) reportTargetType = '申请';
+      else if (object.includes('寻物启事')) reportTargetType = '寻物启事';
+      else if (object.includes('失物招领')) reportTargetType = '失物招领';
+      else reportTargetType = '申请';
+    }
+
+    let detailAction = 'none';
+    if (type === '失物招领' || type === '寻物启事' || type === '认领申请' || type === '归还申请') {
+      if (itemId) detailAction = 'item';
+    } else if (type === '举报') {
+      if (reportTargetType === '聊天消息') detailAction = 'chat';
+      else if (itemId) detailAction = 'item';
+    }
+
+    return {
+      type,
+      event,
+      itemName,
+      itemId,
+      chatClaimId,
+      reportTargetType,
+      detailAction,
+      detail,
+      normalized
+    };
+  }
+
+  function withinDays(createdAt, days) {
+    if (!days) return true;
+    if (!createdAt) return false;
+    const t = new Date(createdAt).getTime();
+    if (Number.isNaN(t)) return false;
+    return Date.now() - t <= Number(days) * 24 * 60 * 60 * 1000;
+  }
+
   try {
     const data = await api('/api/notifications');
-    const list = data.data || [];
-    document.getElementById('sysNotifyList').innerHTML = list.length === 0
-      ? '<p class="empty">暂无系统通知</p>'
-      : list.map(n => `
-        <div class="notify-card">
-          <div class="notify-content">${esc(n.content || '')}</div>
-          <div class="notify-time">发布于：${fmtTime(n.createdAt)}</div>
-        </div>
-      `).join('');
+    const rawList = data.data || [];
+    const list = rawList.map(n => ({
+      ...n,
+      __parsed: parseNotify(n.content || '')
+    }));
+
+    function render() {
+      const type = document.getElementById('nType').value;
+      const days = document.getElementById('nTime').value;
+
+      const filtered = list.filter(n => {
+        const p = n.__parsed;
+        if (type && p.type !== type) return false;
+        if (!withinDays(n.createdAt, days)) return false;
+        return true;
+      });
+
+      document.getElementById('sysNotifyList').innerHTML = filtered.length === 0
+        ? '<p class="empty">暂无系统通知</p>'
+        : filtered.map(n => `
+          <div class="notify-card" ${n.__parsed.itemId && (n.__parsed.type === '失物招领' || n.__parsed.type === '寻物启事') ? `data-item-id="${n.__parsed.itemId}"` : ''}>
+            <div class="notify-head">
+              <span class="notify-type">${esc(n.__parsed.type)}</span>
+            </div>
+            <div class="notify-content">
+              <div class="notify-line"><b>事件：</b>${esc(n.__parsed.event)}</div>
+              <div class="notify-line"><b>说明：</b>${esc(n.__parsed.detail || '无')}</div>
+              ${(n.__parsed.type === '失物招领' || n.__parsed.type === '寻物启事')
+                ? `<div class="notify-line"><b>物品名称：</b>${esc(n.__parsed.itemName || '无')}</div>
+                   <div class="notify-line">${n.__parsed.itemId ? '<button class="btn-sm notify-link" data-detail-id="' + n.__parsed.itemId + '">查看帖子详情</button>' : '<span style="color:#999">暂无可跳转详情</span>'}</div>`
+                : ''}
+              ${(n.__parsed.type === '认领申请' || n.__parsed.type === '归还申请')
+                ? `<div class="notify-line"><b>物品名称：</b>${esc(n.__parsed.itemName || '无')}</div>
+                   <div class="notify-line">${n.__parsed.itemId ? '<button class="btn-sm notify-link" data-detail-id="' + n.__parsed.itemId + '">查看申请详情</button>' : '<span style="color:#999">暂无可跳转详情</span>'}</div>`
+                : ''}
+              ${n.__parsed.type === '举报'
+                ? `<div class="notify-line"><b>举报对象类型：</b>${esc(n.__parsed.reportTargetType || '申请')}</div>
+                   <div class="notify-line">${n.__parsed.detailAction === 'item' ? '<button class="btn-sm notify-link" data-detail-id="' + (n.__parsed.itemId || '') + '">查看举报对象详情</button>' : (n.__parsed.detailAction === 'chat' ? '<button class="btn-sm notify-chat-link">查看聊天详情</button>' : '<span style="color:#999">暂无可跳转详情</span>')}</div>`
+                : ''}
+            </div>
+            <div class="notify-time">发布时间：${fmtTime(n.createdAt)}</div>
+          </div>
+        `).join('');
+
+      document.querySelectorAll('[data-detail-id]').forEach(btn => {
+        btn.onclick = () => {
+          const id = Number(btn.getAttribute('data-detail-id'));
+          if (!id) return;
+          Router.go('detail', { id });
+        };
+      });
+      document.querySelectorAll('.notify-chat-link').forEach(btn => {
+        btn.onclick = () => Router.go('myChat');
+      });
+    }
+
+    ['nType', 'nTime'].forEach(id => {
+      document.getElementById(id).onchange = render;
+    });
+    render();
   } catch (e) {
     document.getElementById('sysNotifyList').innerHTML = `<p class="empty">${e.message}</p>`;
   }
