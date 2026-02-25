@@ -76,6 +76,9 @@ public interface LostItemRepository extends JpaRepository<LostItem, Long> {
        @Query("SELECT COUNT(i) FROM LostItem i WHERE i.status IN :statuses AND (i.updatedAt < :time OR i.createdAt < :time)")
        long countExpiredForCleanup(@Param("statuses") List<String> statuses, @Param("time") LocalDateTime time);
 
+       @Query("SELECT i FROM LostItem i WHERE i.status IN :statuses AND (i.updatedAt < :time OR i.createdAt < :time)")
+       List<LostItem> findExpiredForCleanup(@Param("statuses") List<String> statuses, @Param("time") LocalDateTime time);
+
        @Modifying
        @Query("DELETE FROM LostItem i WHERE i.status IN :statuses AND (i.updatedAt < :time OR i.createdAt < :time)")
        int deleteExpiredForCleanup(@Param("statuses") List<String> statuses, @Param("time") LocalDateTime time);

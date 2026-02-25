@@ -15,6 +15,7 @@ import jakarta.validation.constraints.NotBlank;
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -170,7 +171,29 @@ public class SuperAdminController {
     public ApiResponse<SystemNotification> sendNotification(@RequestBody SendNotificationRequest req, HttpServletRequest servletRequest) {
         requireSuperAdmin(servletRequest);
         Long userId = (Long) servletRequest.getAttribute("loginUserId");
-        return ApiResponse.ok(systemNotificationService.send(userId, req.targetUserId(), req.scope(), req.content()));
+        String scope = req.scope() == null ? "" : req.scope().trim().toUpperCase();
+        if ("ALL".equals(scope)) {
+            return ApiResponse.ok(systemNotificationService.send(userId, null, "ALL", req.content()));
+        }
+
+        List<Long> targets = new ArrayList<>();
+        if (req.targetUserIds() != null) {
+            for (Long id : req.targetUserIds()) {
+                if (id != null && !targets.contains(id)) targets.add(id);
+            }
+        }
+        if (req.targetUserId() != null && !targets.contains(req.targetUserId())) {
+            targets.add(req.targetUserId());
+        }
+        if (targets.isEmpty()) {
+            throw new IllegalArgumentException("请选择至少一个目标用户");
+        }
+
+        SystemNotification last = null;
+        for (Long targetId : targets) {
+            last = systemNotificationService.send(userId, targetId, "USER", req.content());
+        }
+        return ApiResponse.ok(last);
     }
 
     @GetMapping("/complaints")
@@ -205,7 +228,7 @@ public class SuperAdminController {
     public record CreateAdminRequest(@NotBlank String username, @NotBlank String password, String realName, String phone, String region) {}
     public record AnnouncementRequest(@NotBlank String title, @NotBlank String content) {}
     public record ResolveComplaintRequest(@NotBlank String action) {}
-    public record SendNotificationRequest(Long targetUserId, String scope, @NotBlank String content) {}
+    public record SendNotificationRequest(Long targetUserId, List<Long> targetUserIds, String scope, @NotBlank String content) {}
     public record ExportSqlRequest(Integer rangeMonths, List<String> types) {}
     public record CleanupRequest(Integer days) {}
 }

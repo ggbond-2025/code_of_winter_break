@@ -151,8 +151,8 @@ Router.register('systemNotifications', async function (app) {
   `;
 
   try {
-    const data = await api('/api/notifications');
-    const list = data.data || [];
+    const data = await api('/api/notifications?page=0&size=8');
+    const list = (data.data && data.data.content) ? data.data.content : (data.data || []);
     document.getElementById('notifyList').innerHTML = list.length === 0
       ? '<p class="empty">暂无系统通知</p>'
       : list.map(n => `<div style="border:1px solid #ddd;padding:12px;margin-bottom:10px"><p style="line-height:1.8">${esc(n.content || '')}</p><div style="text-align:right;color:#888;font-size:12px">发布于：${fmtTime(n.createdAt)}</div></div>`).join('');

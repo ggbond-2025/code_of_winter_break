@@ -1,10 +1,9 @@
 package com.campus.lostfound.service;
 
 import com.campus.lostfound.model.SystemNotification;
-
-import java.util.List;
+import org.springframework.data.domain.Page;
 
 public interface SystemNotificationService {
     SystemNotification send(Long senderId, Long targetUserId, String scope, String content);
-    List<SystemNotification> listForUser(Long userId);
+    Page<SystemNotification> listForUser(Long userId, int page, int size);
 }

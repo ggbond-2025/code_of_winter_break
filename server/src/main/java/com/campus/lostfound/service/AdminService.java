@@ -14,7 +14,7 @@ public interface AdminService {
 
     LostItem reject(Long itemId, String reason);
 
-    LostItem archive(Long itemId, String method);
+    LostItem archive(Long itemId, String method, String archiveLocation, String archiveImageUrls);
 
     LostItem deleteItem(Long itemId, String reason);
 

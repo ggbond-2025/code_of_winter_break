@@ -74,10 +74,8 @@ public class AdminController {
     @PutMapping("/items/{id}/archive")
     public ApiResponse<LostItem> archive(@PathVariable Long id, @RequestBody ArchiveRequest req, HttpServletRequest servletRequest) {
         requireAdmin(servletRequest);
-        if (req == null || req.method() == null || req.method().trim().isEmpty()) {
-            throw new IllegalArgumentException("处理方式不能为空");
-        }
-        return ApiResponse.ok(adminService.archive(id, req.method()));
+        if (req == null) throw new IllegalArgumentException("请求参数不能为空");
+        return ApiResponse.ok(adminService.archive(id, req.method(), req.location(), req.imageUrls()));
     }
 
     @PostMapping("/announcements/region")
@@ -190,7 +188,7 @@ public class AdminController {
     public record DeleteRequest(@NotBlank(message = "删除理由不能为空") String reason) {}
     public record UpdateInfoRequest(String storageLocation, String contactName, String contactPhone) {}
     public record UpdateStatusRequest(String status) {}
-    public record ArchiveRequest(String method) {}
+    public record ArchiveRequest(String method, String location, String imageUrls) {}
     public record AnnouncementRequest(@NotBlank String title, @NotBlank String content, String region) {}
     public record UpdateItemRequest(
             String title, String description, String category, String location,

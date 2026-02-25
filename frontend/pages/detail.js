@@ -28,6 +28,9 @@ Router.register('detail', async function (app, params) {
     const canClaim = (item.status === 'APPROVED') && Auth.isLoggedIn() && !isOwner && role === 'USER' && !hasActiveClaim;
     const claimBtnLabel = isLost ? '归还申请' : '认领申请';
     const imgs = item.imageUrls ? item.imageUrls.split(',').filter(Boolean) : [];
+    const archiveImgs = item.archiveImageUrls ? item.archiveImageUrls.split(',').filter(Boolean) : [];
+    const showArchiveDetail = item.status === 'ARCHIVED' && item.type === 'FOUND';
+    const previewImageTag = (url) => `<img class="detail-preview-img" data-full="${esc(imgUrl(url))}" src="${imgUrl(url)}" style="width:150px;height:110px;object-fit:cover;border:1px solid #ddd;cursor:zoom-in" onerror="this.style.display='none'" />`;
     const locStr = item.location || '';
     const locParts = locStr.split(' — ');
     const m = locStr.match(/^(朝晖校区|屏峰校区|莫干山校区)/);
@@ -51,6 +54,8 @@ Router.register('detail', async function (app, params) {
               <div class="info-line"><b>${locLabel}：</b>${esc(locStr || '-')}</div>
               <div class="info-line"><b>${timeLabel}：</b>${esc(item.lostTime || '-')}</div>
               <div class="info-line"><b>领取地点：</b>${esc(item.storageLocation || '-')}</div>
+              ${showArchiveDetail ? `<div class="info-line"><b>物品处理方式：</b>${esc(item.archiveMethod || '自行处理')}</div>` : ''}
+              ${showArchiveDetail ? `<div class="info-line"><b>处理地点：</b>${esc(item.archiveLocation || '-')}</div>` : ''}
               <div class="info-line"><b>联系方式：</b>${esc((item.contactPhone || '') + ' ' + (item.contactName || ''))}</div>
               <div class="info-line"><b>物品介绍：</b>${esc(item.description || item.features || '-')}</div>
             </div>
@@ -60,8 +65,16 @@ Router.register('detail', async function (app, params) {
               </div>
             ` : ''}
           </div>
+          <div style="margin-top:14px;font-size:14px;font-weight:bold">发布信息图片：</div>
           <div class="detail-images">
-            ${imgs.length > 0 ? imgs.map(u => imgTag(u, 200, 160)).join('') : '<div class="img-placeholder"></div><div class="img-placeholder"></div>'}
+            ${imgs.length > 0 ? imgs.map(u => previewImageTag(u)).join('') : '<div class="img-placeholder"></div><div class="img-placeholder"></div>'}
+          </div>
+          ${showArchiveDetail ? `<div style="margin-top:14px;font-size:14px;font-weight:bold">归档处理图片：</div><div class="detail-images" style="margin-top:10px">${archiveImgs.length > 0 ? archiveImgs.map(u => previewImageTag(u)).join('') : '<div class="img-placeholder"></div><div class="img-placeholder"></div>'}</div>` : ''}
+        </div>
+        <div id="detailImgPreview" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:1200;align-items:center;justify-content:center">
+          <div style="position:relative;max-width:90vw;max-height:90vh">
+            <span id="detailImgPreviewClose" style="position:absolute;top:-34px;right:0;color:#fff;font-size:30px;cursor:pointer">×</span>
+            <img id="detailImgPreviewImg" src="" style="max-width:90vw;max-height:90vh;object-fit:contain;border:1px solid #fff;background:#fff" />
           </div>
         </div>
         ${canClaim ? `<div style="text-align:center;margin-top:24px"><button class="btn-primary" id="goClaimBtn" style="padding:10px 40px;font-size:16px">${claimBtnLabel}</button></div>` : ''}
@@ -91,6 +104,18 @@ Router.register('detail', async function (app, params) {
         Router.go('claimForm', { id: item.id });
       };
     }
+
+    const previewModal = document.getElementById('detailImgPreview');
+    const previewImg = document.getElementById('detailImgPreviewImg');
+    const closePreview = () => { previewModal.style.display = 'none'; };
+    document.querySelectorAll('.detail-preview-img[data-full]').forEach(el => {
+      el.onclick = () => {
+        previewImg.src = el.dataset.full;
+        previewModal.style.display = 'flex';
+      };
+    });
+    document.getElementById('detailImgPreviewClose').onclick = closePreview;
+    previewModal.onclick = (e) => { if (e.target === previewModal) closePreview(); };
 
     if (isOwner) {
       loadOwnerClaims(item.id, isLost);

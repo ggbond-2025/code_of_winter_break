@@ -74,6 +74,12 @@ public class ItemController {
         return ApiResponse.ok("已取消", null);
     }
 
+    @PutMapping("/{id}/republish")
+    public ApiResponse<LostItem> republish(@PathVariable Long id, HttpServletRequest servletRequest) {
+        Long userId = (Long) servletRequest.getAttribute("loginUserId");
+        return ApiResponse.ok(itemService.republish(userId, id));
+    }
+
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Long id, HttpServletRequest servletRequest) {
         Long userId = (Long) servletRequest.getAttribute("loginUserId");

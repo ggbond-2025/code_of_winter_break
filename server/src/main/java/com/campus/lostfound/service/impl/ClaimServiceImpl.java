@@ -201,6 +201,7 @@ public class ClaimServiceImpl implements ClaimService {
         java.util.Set<Long> notified = new java.util.HashSet<>();
         for (ClaimRecord claim : claims) {
             if (claim == null || claim.getClaimer() == null || claim.getClaimer().getId() == null) continue;
+            if (!"APPROVED".equals(claim.getStatus())) continue;
             Long claimerId = claim.getClaimer().getId();
             if (ownerId != null && ownerId.equals(claimerId)) continue;
             if (!notified.add(claimerId)) continue;

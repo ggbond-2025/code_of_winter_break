@@ -6,7 +6,7 @@ Router.register('history', function (app) {
       <label>物品类型</label><select id="hCat"><option value="">所有</option><option value="证件">证件</option><option value="电子产品">电子产品</option><option value="生活用品">生活用品</option><option value="文体">文体</option><option value="书籍">书籍</option><option value="其他">其他</option></select>
       <label>地点</label><select id="hLoc"><option value="">所有</option><option value="朝晖校区">朝晖校区</option><option value="屏峰校区">屏峰校区</option><option value="莫干山校区">莫干山校区</option></select>
       <label>时间范围</label><select id="hTime"><option value="">所有</option></select>
-      <label>物品状态</label><select id="hStatus"><option value="">所有</option><option value="PENDING">待审核</option><option value="CLAIM_ADMIN_REVIEW">管理员审核申请中</option><option value="CLAIM_OWNER_REVIEW">发布人审核申请中</option><option value="APPROVED">未匹配</option><option value="REJECTED">已驳回</option><option value="MATCHED">已匹配</option><option value="CLAIMED">已认领</option><option value="CANCELLED">已取消</option><option value="ADMIN_DELETED">管理员删除</option></select>
+      <label>物品状态</label><select id="hStatus"><option value="">所有</option><option value="PENDING">待审核</option><option value="CLAIM_ADMIN_REVIEW">管理员审核申请中</option><option value="CLAIM_OWNER_REVIEW">发布人审核申请中</option><option value="APPROVED">未匹配</option><option value="REJECTED">已驳回</option><option value="MATCHED">已匹配</option><option value="CLAIMED">已认领</option><option value="CANCELLED">已取消</option></select>
       <label>物品名查找</label><input type="text" id="hKeyword" />
       <span class="search-icon" id="hSearchBtn">&#128269;</span>
     </div>
@@ -47,6 +47,9 @@ Router.register('history', function (app) {
           } else if (isApproved) {
             actions += `<button class="btn-sm" data-modify="${item.id}" style="margin-right:6px">补充介绍</button>`;
             actions += `<button class="btn-sm btn-danger" data-cancel="${item.id}">取消发布</button>`;
+          } else if (item.status === 'CANCELLED') {
+            actions += `<button class="btn-sm" data-republish="${item.id}" style="margin-right:6px">重新发布</button>`;
+            actions += `<button class="btn-sm btn-danger" data-delete="${item.id}">删除</button>`;
           }
           return card + (actions ? `<div style="text-align:right;margin-top:-8px;margin-bottom:12px">${actions}</div>` : '');
         }).join('');
@@ -69,6 +72,15 @@ Router.register('history', function (app) {
           e.stopPropagation();
           if (!confirm('确定删除此记录？删除后不可恢复')) return;
           try { await api(`/api/items/${btn.dataset.delete}`, { method: 'DELETE' }); load(); }
+          catch (err) { alert(err.message); }
+        };
+      });
+
+      document.querySelectorAll('[data-republish]').forEach(btn => {
+        btn.onclick = async (e) => {
+          e.stopPropagation();
+          if (!confirm('确定重新发布该帖子？')) return;
+          try { await api(`/api/items/${btn.dataset.republish}/republish`, { method: 'PUT' }); load(); }
           catch (err) { alert(err.message); }
         };
       });

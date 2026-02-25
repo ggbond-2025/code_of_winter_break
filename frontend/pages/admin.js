@@ -267,18 +267,19 @@ Router.register('adminManage', function (app) {
       </div>
     </div>
     <div id="archiveModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1001;align-items:center;justify-content:center">
-      <div style="background:#fff;padding:24px;border-radius:8px;min-width:320px;box-shadow:0 4px 20px rgba(0,0,0,0.15)">
-        <div style="margin-bottom:8px;font-weight:bold">确认归档</div>
-        <div style="font-size:13px;color:#666;margin-bottom:12px">归档后该物品将进入历史记录</div>
-        <div style="margin-bottom:8px;font-weight:bold">处理方式</div>
-        <select id="archiveMethodSelect" style="width:100%;padding:8px 12px;margin-bottom:8px;border:1px solid #ddd;border-radius:4px;font-size:14px">
-          <option value="仅设置归档">仅设置归档</option>
-          <option value="归档后删除">归档后删除</option>
-          <option value="归档后延时删除" id="archiveDelayOption">归档后延时30天删除</option>
+      <div style="background:#fff;padding:18px 20px;min-width:540px;max-width:92%;position:relative;border:1px solid #ddd">
+        <div id="archiveCloseBtn" style="position:absolute;right:12px;top:8px;font-size:34px;font-weight:bold;line-height:1;cursor:pointer">×</div>
+        <div style="font-size:36px;font-weight:bold;line-height:1;margin:6px 0 20px">物品处理方式填写：</div>
+        <select id="archiveMethodSelect" style="width:150px;padding:8px;border:1px solid #999;margin-bottom:20px">
+          <option value="自行处理">自行处理</option>
+          <option value="统一销毁">统一销毁</option>
+          <option value="存储点存放">存储点存放</option>
         </select>
-        <div id="archiveError" style="color:#e74c3c;min-height:18px"></div>
+        <div style="font-size:34px;font-weight:bold;line-height:1;margin:0 0 18px">填写具体地点以及照片：</div>
+        <input id="archiveLocationInput" style="width:360px;padding:8px;border:1px solid #999;margin-bottom:20px" />
+        <div id="archiveImgBox" style="display:flex;gap:18px;align-items:center"></div>
+        <div id="archiveError" style="color:#e74c3c;min-height:18px;margin-top:10px"></div>
         <div style="text-align:right;margin-top:10px">
-          <button class="btn-sm" id="archiveCancelBtn" style="margin-right:8px">取消</button>
           <button class="btn-sm btn-danger" id="archiveConfirmBtn">确认归档</button>
         </div>
       </div>
@@ -297,21 +298,53 @@ Router.register('adminManage', function (app) {
   let pg = 0;
   let claimExpireDays = 30;
   const itemMap = new Map();
+  let archiveUploadedUrls = [];
 
-  function refreshArchiveDelayOptionText() {
-    const option = document.getElementById('archiveDelayOption');
-    if (!option) return;
-    option.textContent = `归档后延时${claimExpireDays}天删除`;
+  function renderArchiveImageSlots() {
+    const box = document.getElementById('archiveImgBox');
+    if (!box) return;
+    const slots = [];
+    for (let i = 0; i < 2; i++) {
+      const url = archiveUploadedUrls[i];
+      if (url) {
+        slots.push(`
+          <div style="position:relative;width:130px;height:130px;border:1px dashed #ddd;display:flex;align-items:center;justify-content:center">
+            <img src="${imgUrl(url)}" style="width:100%;height:100%;object-fit:cover" />
+            <span data-archive-rm="${esc(url)}" style="position:absolute;top:-8px;right:-8px;background:#e74c3c;color:#fff;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer">×</span>
+          </div>
+        `);
+      } else {
+        slots.push(`
+          <label style="width:130px;height:130px;border:1px dashed #ddd;display:flex;align-items:center;justify-content:center;font-size:52px;cursor:pointer;line-height:1">+
+            <input type="file" accept="image/*" data-archive-upload="${i}" style="display:none" />
+          </label>
+        `);
+      }
+    }
+    box.innerHTML = slots.join('');
   }
 
-  refreshArchiveDelayOptionText();
+  async function uploadArchiveImage(file) {
+    const formData = new FormData();
+    formData.append('files', file);
+    const token = Auth.getToken();
+    const res = await fetch(API_BASE + '/api/files/upload', {
+      method: 'POST',
+      headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+      body: formData
+    });
+    const d = await res.json();
+    if (!res.ok || d.success === false) throw new Error(d.message || '上传失败');
+    const urls = d.data || [];
+    if (!urls.length) throw new Error('上传失败');
+    return urls[0];
+  }
 
   (async () => {
     try {
       const cfg = await getConfig();
       if (cfg && cfg.claimExpireDays && Number(cfg.claimExpireDays) > 0) {
         claimExpireDays = Number(cfg.claimExpireDays);
-        refreshArchiveDelayOptionText();
       }
     } catch (_) {}
   })();
@@ -327,9 +360,11 @@ Router.register('adminManage', function (app) {
   function openArchiveModal(itemId) {
     const archiveModal = document.getElementById('archiveModal');
     archiveModal._itemId = itemId;
-    refreshArchiveDelayOptionText();
-    document.getElementById('archiveMethodSelect').value = '仅设置归档';
+    archiveUploadedUrls = [];
+    document.getElementById('archiveMethodSelect').value = '自行处理';
+    document.getElementById('archiveLocationInput').value = '';
     document.getElementById('archiveError').textContent = '';
+    renderArchiveImageSlots();
     archiveModal.style.display = 'flex';
   }
 
@@ -347,12 +382,27 @@ Router.register('adminManage', function (app) {
 
   function startArchiveFlow(itemId) {
     const item = itemMap.get(String(itemId));
+    if (!item) return;
     const daysSince = daysSinceLastAction(item);
     if (daysSince < claimExpireDays) {
       openArchiveGuardModal(itemId);
       return;
     }
-    openArchiveModal(itemId);
+    if (item.type === 'FOUND') {
+      openArchiveModal(itemId);
+      return;
+    }
+    submitArchive(itemId, { method: '', location: '', imageUrls: '' }).catch(err => alert(err.message));
+  }
+
+  async function submitArchive(itemId, payload) {
+    await api(`/api/admin/items/${itemId}/archive`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    });
+    const archiveModal = document.getElementById('archiveModal');
+    archiveModal.style.display = 'none';
+    load();
   }
 
   fillCategorySelect('mCat');
@@ -373,6 +423,7 @@ Router.register('adminManage', function (app) {
         : list.map(item => {
           const imgs = item.imageUrls ? item.imageUrls.split(',').filter(Boolean) : [];
           const isLost = item.type === 'LOST';
+          const showArchiveDetail = item.status === 'ARCHIVED' && item.type === 'FOUND';
           const daysSince = daysSinceLastAction(item);
           return `
             <div class="manage-card">
@@ -385,6 +436,8 @@ Router.register('adminManage', function (app) {
                     <div>物品类型：${esc(item.category || '-')}</div>
                     <div>${isLost ? '丢失' : '拾取'}地点：${esc(item.location || '-')}</div>
                     <div>${isLost ? '丢失' : '拾得'}时间：${esc(item.lostTime || '-')}</div>
+                    ${showArchiveDetail ? `<div>处理方式：${esc(item.archiveMethod || '自行处理')}</div>` : ''}
+                    ${showArchiveDetail ? `<div>处理地点：${esc(item.archiveLocation || '-')}</div>` : ''}
                   </div>
                 </div>
                 <div class="card-right">
@@ -450,22 +503,48 @@ Router.register('adminManage', function (app) {
   document.getElementById('statusModal').addEventListener('click', function (e) {
     if (e.target === this) this.style.display = 'none';
   });
-  document.getElementById('archiveCancelBtn').onclick = () => {
+
+  document.getElementById('archiveCloseBtn').onclick = () => {
     document.getElementById('archiveModal').style.display = 'none';
   };
+
+  document.getElementById('archiveImgBox').addEventListener('change', async (e) => {
+    const input = e.target.closest('input[data-archive-upload]');
+    if (!input || !input.files || !input.files.length) return;
+    try {
+      const url = await uploadArchiveImage(input.files[0]);
+      if (archiveUploadedUrls.length < 2) {
+        archiveUploadedUrls.push(url);
+      }
+      renderArchiveImageSlots();
+    } catch (err) {
+      document.getElementById('archiveError').textContent = err.message;
+    }
+  });
+
+  document.getElementById('archiveImgBox').addEventListener('click', (e) => {
+    const rm = e.target.closest('[data-archive-rm]');
+    if (!rm) return;
+    archiveUploadedUrls = archiveUploadedUrls.filter(u => u !== rm.dataset.archiveRm);
+    renderArchiveImageSlots();
+  });
+
   document.getElementById('archiveConfirmBtn').onclick = async () => {
     const archiveModal = document.getElementById('archiveModal');
     const itemId = archiveModal._itemId;
     if (!itemId) return;
     const method = document.getElementById('archiveMethodSelect').value;
+    const location = (document.getElementById('archiveLocationInput').value || '').trim();
     if (!method.trim()) {
       document.getElementById('archiveError').textContent = '请选择处理方式';
       return;
     }
     try {
-      await api(`/api/admin/items/${itemId}/archive`, { method: 'PUT', body: JSON.stringify({ method }) });
-      archiveModal.style.display = 'none';
-      load();
+      await submitArchive(itemId, {
+        method,
+        location,
+        imageUrls: archiveUploadedUrls.join(',')
+      });
     } catch (e) {
       document.getElementById('archiveError').textContent = e.message;
     }
@@ -478,7 +557,14 @@ Router.register('adminManage', function (app) {
     const guard = document.getElementById('archiveGuardModal');
     const itemId = guard._itemId;
     closeArchiveGuardModal();
-    if (itemId) openArchiveModal(itemId);
+    if (!itemId) return;
+    const item = itemMap.get(String(itemId));
+    if (!item) return;
+    if (item.type === 'FOUND') {
+      openArchiveModal(itemId);
+      return;
+    }
+    submitArchive(itemId, { method: '', location: '', imageUrls: '' }).catch(err => alert(err.message));
   };
   document.getElementById('archiveGuardNo').onclick = () => {
     closeArchiveGuardModal();
@@ -1132,8 +1218,8 @@ Router.register('adminNotify', async function (app) {
   const main = renderLayout(app, 'ADMIN', 'adminNotify');
   main.innerHTML = '<div id="adminNotifyList"></div>';
   try {
-    const data = await api('/api/notifications');
-    const list = data.data || [];
+    const data = await api('/api/notifications?page=0&size=8');
+    const list = (data.data && data.data.content) ? data.data.content : (data.data || []);
     document.getElementById('adminNotifyList').innerHTML = list.length === 0
       ? '<p class="empty">暂无系统通知</p>'
       : list.map(n => `

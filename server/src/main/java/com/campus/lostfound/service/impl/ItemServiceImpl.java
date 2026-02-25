@@ -180,14 +180,32 @@ public class ItemServiceImpl implements ItemService {
     }
 
     @Override
+    public LostItem republish(Long userId, Long itemId) {
+        LostItem item = lostItemRepository.findById(itemId)
+                .orElseThrow(() -> new IllegalArgumentException("物品不存在"));
+        if (!item.getCreator().getId().equals(userId)) {
+            throw new IllegalArgumentException("只能重新发布自己的帖子");
+        }
+        if (!"CANCELLED".equals(item.getStatus())) {
+            throw new IllegalArgumentException("只有已取消的帖子可以重新发布");
+        }
+        String oldStatus = item.getStatus();
+        SystemConfig cfg = systemConfigService.getConfig();
+        item.setStatus(cfg.isEnableReview() ? "PENDING" : "APPROVED");
+        LostItem saved = lostItemRepository.save(item);
+        notifyPostStatusChanged(saved, oldStatus, saved.getStatus(), "你已重新发布该帖子");
+        return saved;
+    }
+
+    @Override
     public void deleteByUser(Long userId, Long itemId) {
         LostItem item = lostItemRepository.findById(itemId)
                 .orElseThrow(() -> new IllegalArgumentException("物品不存在"));
         if (!item.getCreator().getId().equals(userId)) {
             throw new IllegalArgumentException("只能删除自己的发布");
         }
-        if (!"PENDING".equals(item.getStatus()) && !"REJECTED".equals(item.getStatus())) {
-            throw new IllegalArgumentException("只有待审核或已驳回的记录可以删除");
+        if (!"PENDING".equals(item.getStatus()) && !"REJECTED".equals(item.getStatus()) && !"CANCELLED".equals(item.getStatus())) {
+            throw new IllegalArgumentException("只有待审核、已驳回或已取消的记录可以删除");
         }
         sendBizNotice(userId,
             postNoticeObject(item),

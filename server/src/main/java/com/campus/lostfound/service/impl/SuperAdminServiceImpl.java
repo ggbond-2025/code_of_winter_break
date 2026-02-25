@@ -1,12 +1,17 @@
 package com.campus.lostfound.service.impl;
 
 import com.campus.lostfound.model.Announcement;
+import com.campus.lostfound.model.ClaimRecord;
+import com.campus.lostfound.model.LostItem;
 import com.campus.lostfound.model.User;
 import com.campus.lostfound.repository.AnnouncementRepository;
+import com.campus.lostfound.repository.ChatMessageRepository;
+import com.campus.lostfound.repository.ClaimRecordRepository;
 import com.campus.lostfound.repository.ComplaintRecordRepository;
 import com.campus.lostfound.repository.LostItemRepository;
 import com.campus.lostfound.repository.UserRepository;
 import com.campus.lostfound.service.SuperAdminService;
+import com.campus.lostfound.service.SystemNotificationService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -44,12 +49,15 @@ public class SuperAdminServiceImpl implements SuperAdminService {
 
     private static final DateTimeFormatter BACKUP_DIR_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
     private static final DateTimeFormatter DISPLAY_FORMATTER = DateTimeFormatter.ofPattern("yyyy年M月d日 HH:mm:ss");
-    private static final List<String> CLEANUP_STATUSES = List.of("ARCHIVED", "ADMIN_DELETED", "CLAIMED");
+    private static final List<String> CLEANUP_STATUSES = List.of("CLAIMED", "ARCHIVED", "CANCELLED", "REJECTED");
 
     private final UserRepository userRepository;
     private final AnnouncementRepository announcementRepository;
     private final LostItemRepository lostItemRepository;
     private final ComplaintRecordRepository complaintRecordRepository;
+    private final ClaimRecordRepository claimRecordRepository;
+    private final ChatMessageRepository chatMessageRepository;
+    private final SystemNotificationService systemNotificationService;
     private final PasswordEncoder passwordEncoder;
     private final DataSource dataSource;
     private final String backupOutputDir;
@@ -59,6 +67,9 @@ public class SuperAdminServiceImpl implements SuperAdminService {
                                  AnnouncementRepository announcementRepository,
                                  LostItemRepository lostItemRepository,
                                  ComplaintRecordRepository complaintRecordRepository,
+                                 ClaimRecordRepository claimRecordRepository,
+                                 ChatMessageRepository chatMessageRepository,
+                                 SystemNotificationService systemNotificationService,
                                  PasswordEncoder passwordEncoder,
                                  DataSource dataSource,
                                  @Value("${backup.output-dir:backups/sql}") String backupOutputDir,
@@ -67,6 +78,9 @@ public class SuperAdminServiceImpl implements SuperAdminService {
         this.announcementRepository = announcementRepository;
         this.lostItemRepository = lostItemRepository;
         this.complaintRecordRepository = complaintRecordRepository;
+        this.claimRecordRepository = claimRecordRepository;
+        this.chatMessageRepository = chatMessageRepository;
+        this.systemNotificationService = systemNotificationService;
         this.passwordEncoder = passwordEncoder;
         this.dataSource = dataSource;
         this.backupOutputDir = backupOutputDir;
@@ -344,7 +358,7 @@ public class SuperAdminServiceImpl implements SuperAdminService {
         LinkedHashMap<String, Object> res = new LinkedHashMap<>();
         res.put("days", validDays);
         res.put("count", count);
-        res.put("statuses", List.of("已归档", "已删除", "已认领"));
+        res.put("statuses", List.of("已认领", "已归档", "已取消", "已驳回"));
         return res;
     }
 
@@ -353,12 +367,46 @@ public class SuperAdminServiceImpl implements SuperAdminService {
     public Map<String, Object> cleanupExpiredData(Integer days) {
         int validDays = validateCleanupDays(days);
         LocalDateTime before = LocalDateTime.now().minusDays(validDays);
-        int cleaned = lostItemRepository.deleteExpiredForCleanup(CLEANUP_STATUSES, before);
+        List<LostItem> expiredItems = lostItemRepository.findExpiredForCleanup(CLEANUP_STATUSES, before);
+        int cleaned = 0;
+        for (LostItem item : expiredItems) {
+            if (item == null || item.getId() == null) continue;
+            sendCleanupDeletedNotice(item);
+            deleteItemWithRefsCleaned(item);
+            cleaned++;
+        }
         LinkedHashMap<String, Object> res = new LinkedHashMap<>();
         res.put("days", validDays);
         res.put("cleanedCount", cleaned);
-        res.put("statuses", List.of("已归档", "已删除", "已认领"));
+        res.put("statuses", List.of("已认领", "已归档", "已取消", "已驳回"));
         return res;
+    }
+
+    private void deleteItemWithRefsCleaned(LostItem item) {
+        if (item == null || item.getId() == null) return;
+        List<ClaimRecord> claims = claimRecordRepository.findByItemIdOrderByCreatedAtDesc(item.getId());
+        if (!claims.isEmpty()) {
+            List<Long> claimIds = claims.stream().map(ClaimRecord::getId).filter(java.util.Objects::nonNull).toList();
+            if (!claimIds.isEmpty()) {
+                complaintRecordRepository.clearChatMessageReferenceByClaimIds(claimIds);
+                chatMessageRepository.deleteByClaimIdIn(claimIds);
+                complaintRecordRepository.clearClaimReferenceByClaimIds(claimIds);
+            }
+            claimRecordRepository.deleteByItemId(item.getId());
+        }
+        complaintRecordRepository.clearItemReferenceByItemId(item.getId());
+        lostItemRepository.delete(item);
+    }
+
+    private void sendCleanupDeletedNotice(LostItem item) {
+        if (item == null || item.getCreator() == null || item.getCreator().getId() == null) return;
+        Long userId = item.getCreator().getId();
+        String idText = item.getId() == null ? "0" : String.valueOf(item.getId());
+        String typeText = "LOST".equals(item.getType()) ? "寻物启事" : "失物招领";
+        String title = item.getTitle() == null || item.getTitle().isBlank() ? "未命名帖子" : item.getTitle();
+        String content = String.format("【系统通知】对象：%s《%s》#%s；事件：删除帖子；状态：已删除；说明：系统清理过期数据，帖子已删除。",
+                typeText, title, idText);
+        systemNotificationService.send(userId, userId, "USER", content);
     }
 
     private Path getBackupRootDir() {

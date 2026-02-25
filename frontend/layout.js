@@ -92,6 +92,7 @@ function itemCardHtml(item) {
   const loc = rawLoc;
   const time = item.lostTime || '';
   const imgs = item.imageUrls ? item.imageUrls.split(',').filter(Boolean) : [];
+  const showArchiveDetail = item.status === 'ARCHIVED' && item.type === 'FOUND';
 
   return `
     <div class="item-card-row" data-id="${item.id}">
@@ -104,6 +105,8 @@ function itemCardHtml(item) {
           <div>物品类型：${esc(item.category || '-')}</div>
           <div>${locLabel}：${esc(loc)}</div>
           <div>${timeLabel}：${esc(time || '-')}</div>
+          ${showArchiveDetail ? `<div>处理方式：${esc(item.archiveMethod || '自行处理')}</div>` : ''}
+          ${showArchiveDetail && item.archiveLocation ? `<div>处理地点：${esc(item.archiveLocation)}</div>` : ''}
         </div>
       </div>
       <div class="card-right-wrap">

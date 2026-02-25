@@ -22,5 +22,7 @@ public interface ItemService {
 
     void cancel(Long userId, Long itemId);
 
+    LostItem republish(Long userId, Long itemId);
+
     void deleteByUser(Long userId, Long itemId);
 }

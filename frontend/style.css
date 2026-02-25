@@ -86,8 +86,8 @@ body { font-family: 'Microsoft YaHei', Arial, sans-serif; background: #fff; colo
 .detail-box .info-line { font-size: 14px; line-height: 2; }
 .detail-box .info-line b { margin-right: 8px; }
 .detail-images { display: flex; gap: 16px; margin-top: 16px; flex-wrap: wrap; }
-.detail-images img { width: 200px; height: 160px; object-fit: cover; border: 1px solid #ddd; }
-.detail-images .img-placeholder { width: 200px; height: 160px; background: #e8e8e8; }
+.detail-images img { width: 150px; height: 110px; object-fit: cover; border: 1px solid #ddd; }
+.detail-images .img-placeholder { width: 150px; height: 110px; background: #e8e8e8; }
 .reject-box { background: #fff3cd; padding: 10px; margin-left: 20px; font-size: 13px; }
 
 /* ---- Publish form ---- */

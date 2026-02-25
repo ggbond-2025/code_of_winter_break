@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -84,7 +85,7 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional
-    public LostItem archive(Long itemId, String method) {
+    public LostItem archive(Long itemId, String method, String archiveLocation, String archiveImageUrls) {
         LostItem item = lostItemRepository.findById(itemId)
                 .orElseThrow(() -> new IllegalArgumentException("物品不存在"));
         if ("ARCHIVED".equals(item.getStatus())) {
@@ -93,20 +94,16 @@ public class AdminServiceImpl implements AdminService {
         String oldStatus = item.getStatus();
         item.setStatus("ARCHIVED");
         String m = method == null ? "" : method.trim();
-        if (m.isEmpty()) m = "仅设置归档";
-        if (m.startsWith("归档后延时") && m.endsWith("删除")) {
-            m = "归档后延时删除";
+        boolean isFound = "FOUND".equals(item.getType());
+        if (isFound && m.isEmpty()) {
+            throw new IllegalArgumentException("失物招领归档时处理方式不能为空");
+        }
+        if (m.isEmpty()) {
+            m = null;
         }
         item.setArchiveMethod(m);
-        if ("归档后删除".equals(m)) {
-            sendBizNotice(item.getCreator() != null ? item.getCreator().getId() : null,
-                postNoticeObject(item),
-                "状态变更",
-                safeStatus("ARCHIVED"),
-                String.format("状态由 %s 变更为 %s；管理员设置归档后立即删除", safeStatus(oldStatus), safeStatus("ARCHIVED")));
-            deleteItemWithRefsCleaned(item);
-            return item;
-        }
+        item.setArchiveLocation(safeArchiveLocation(archiveLocation));
+        item.setArchiveImageUrls(safeArchiveImageUrls(archiveImageUrls));
         LostItem saved = lostItemRepository.save(item);
         notifyPostStatusChanged(saved, oldStatus, saved.getStatus(), "管理员设置归档");
         return saved;
@@ -121,12 +118,13 @@ public class AdminServiceImpl implements AdminService {
         if (r.isEmpty()) {
             throw new IllegalArgumentException("删除理由不能为空");
         }
-        String oldStatus = item.getStatus();
-        item.setStatus("ADMIN_DELETED");
-        item.setRejectReason(r);
-        LostItem saved = lostItemRepository.save(item);
-        notifyPostStatusChanged(saved, oldStatus, saved.getStatus(), "管理员删除原因：" + r);
-        return saved;
+        sendBizNotice(item.getCreator() != null ? item.getCreator().getId() : null,
+                postNoticeObject(item),
+                "删除帖子",
+                "已删除",
+                "管理员删除原因：" + r);
+        deleteItemWithRefsCleaned(item);
+        return item;
     }
 
     @Override
@@ -152,9 +150,12 @@ public class AdminServiceImpl implements AdminService {
             throw new IllegalArgumentException("无效的状态");
         }
         String oldStatus = item.getStatus();
+        if (s.equals(oldStatus)) {
+            throw new IllegalArgumentException("状态未变化，无需修改");
+        }
         item.setStatus(s);
         LostItem saved = lostItemRepository.save(item);
-        notifyPostStatusChanged(saved, oldStatus, saved.getStatus(), "管理员手动更改状态");
+        notifyPostStatusChanged(saved, oldStatus, saved.getStatus(), null);
         return saved;
     }
 
@@ -231,9 +232,27 @@ public class AdminServiceImpl implements AdminService {
         long rejectedItems = lostItemRepository.countByStatus("REJECTED");
         long pendingItems = lostItemRepository.countByStatus("PENDING");
         long cancelledItems = lostItemRepository.countByStatus("CANCELLED");
-        double claimRate = totalItems == 0 ? 0 : ((double) claimedItems / (double) totalItems) * 100.0;
 
         List<LostItem> items = lostItemRepository.findAll();
+        Set<Long> approvedClaimItemIds = claimRecordRepository.findByStatusOrderByCreatedAtDesc("APPROVED").stream()
+            .map(ClaimRecord::getItem)
+            .filter(java.util.Objects::nonNull)
+            .map(LostItem::getId)
+            .filter(java.util.Objects::nonNull)
+            .collect(Collectors.toSet());
+
+        long publishedSuccessItems = items.stream()
+            .filter(i -> i != null && isPublishedSuccessStatus(i.getStatus()))
+            .count();
+
+        long claimedOrClaimArchivedItems = items.stream()
+            .filter(i -> i != null && isClaimedOrClaimArchived(i, approvedClaimItemIds))
+            .count();
+
+        double claimRate = publishedSuccessItems == 0
+            ? 0
+            : ((double) claimedOrClaimArchivedItems / (double) publishedSuccessItems) * 100.0;
+
         List<Map<String, Object>> monthlyStats = new ArrayList<>();
         LocalDate now = LocalDate.now();
         for (int i = 11; i >= 0; i--) {
@@ -279,6 +298,19 @@ public class AdminServiceImpl implements AdminService {
         return res;
     }
 
+    private boolean isPublishedSuccessStatus(String status) {
+        if (status == null) return false;
+        return !Set.of("PENDING", "REJECTED", "CANCELLED", "ADMIN_DELETED").contains(status);
+    }
+
+    private boolean isClaimedOrClaimArchived(LostItem item, Set<Long> approvedClaimItemIds) {
+        String status = item.getStatus();
+        if ("CLAIMED".equals(status)) return true;
+        if (!"ARCHIVED".equals(status)) return false;
+        Long itemId = item.getId();
+        return itemId != null && approvedClaimItemIds.contains(itemId);
+    }
+
     @Scheduled(cron = "0 10 2 * * *")
     public void autoArchiveUnmatchedItems() {
         SystemConfig cfg = systemConfigService.getConfig();
@@ -289,22 +321,11 @@ public class AdminServiceImpl implements AdminService {
         for (LostItem item : candidates) {
             String oldStatus = item.getStatus();
             item.setStatus("ARCHIVED");
-            item.setArchiveMethod("仅设置归档");
+            item.setArchiveMethod("FOUND".equals(item.getType()) ? "自行处理" : null);
+            item.setArchiveLocation(null);
+            item.setArchiveImageUrls(null);
             LostItem saved = lostItemRepository.save(item);
             notifyPostStatusChanged(saved, oldStatus, saved.getStatus(), "系统根据认领时效自动归档");
-        }
-    }
-
-    @Scheduled(cron = "0 30 2 * * *")
-    @Transactional
-    public void autoDeleteArchivedItems() {
-        SystemConfig cfg = systemConfigService.getConfig();
-        int days = cfg.getClaimExpireDays() != null && cfg.getClaimExpireDays() > 0 ? cfg.getClaimExpireDays() : 30;
-        LocalDateTime threshold = LocalDateTime.now().minusDays(days);
-        List<LostItem> archived = lostItemRepository.findByStatusAndUpdatedAtBefore("ARCHIVED", threshold);
-        for (LostItem item : archived) {
-            if (!isDelayedDeleteMethod(item.getArchiveMethod())) continue;
-            deleteItemWithRefsCleaned(item);
         }
     }
 
@@ -324,14 +345,6 @@ public class AdminServiceImpl implements AdminService {
         lostItemRepository.delete(item);
     }
 
-    private boolean isDelayedDeleteMethod(String method) {
-        if (method == null) return false;
-        String m = method.trim();
-        return "归档后延时删除".equals(m)
-                || "归档后延时30天删除".equals(m)
-                || (m.startsWith("归档后延时") && m.endsWith("删除"));
-    }
-
     private void notifyPostStatusChanged(LostItem item, String oldStatus, String newStatus, String extra) {
         if (item == null || item.getCreator() == null || newStatus == null || newStatus.equals(oldStatus)) return;
         String detail = (extra == null || extra.isBlank())
@@ -342,6 +355,38 @@ public class AdminServiceImpl implements AdminService {
             "状态变更",
             safeStatus(newStatus),
             detail);
+        notifyApprovedClaimers(item, safeStatus(newStatus), detail);
+    }
+
+    private void notifyApprovedClaimers(LostItem item, String state, String detail) {
+        if (item == null || item.getId() == null) return;
+        Long ownerId = item.getCreator() != null ? item.getCreator().getId() : null;
+        List<ClaimRecord> claims = claimRecordRepository.findByItemIdOrderByCreatedAtDesc(item.getId());
+        java.util.Set<Long> notified = new java.util.HashSet<>();
+        for (ClaimRecord claim : claims) {
+            if (claim == null || claim.getClaimer() == null || claim.getClaimer().getId() == null) continue;
+            if (!"APPROVED".equals(claim.getStatus())) continue;
+            Long claimerId = claim.getClaimer().getId();
+            if (ownerId != null && ownerId.equals(claimerId)) continue;
+            if (!notified.add(claimerId)) continue;
+            sendBizNotice(claimerId,
+                    postNoticeObject(item),
+                    "状态变更",
+                    state,
+                    detail);
+        }
+    }
+
+    private String safeArchiveLocation(String location) {
+        if (location == null) return null;
+        String value = location.trim();
+        return value.isEmpty() ? null : value;
+    }
+
+    private String safeArchiveImageUrls(String imageUrls) {
+        if (imageUrls == null) return null;
+        String value = imageUrls.trim();
+        return value.isEmpty() ? null : value;
     }
 
     private void sendUserNotice(Long userId, String content) {

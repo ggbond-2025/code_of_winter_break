@@ -69,6 +69,9 @@ Base URL: `http://localhost:8080`
 ### 3.6 取消发布
 - **PUT** `/api/items/{id}/cancel`
 
+### 3.7 重新发布（仅已取消）
+- **PUT** `/api/items/{id}/republish`
+
 ---
 
 ## 4. 认领接口 `/api/claims`
@@ -213,13 +216,13 @@ Base URL: `http://localhost:8080`
 
 ### 6.13 预估过期数据清理条数
 - **GET** `/api/super/cleanup/preview?days=7`
-- 说明：统计“已归档、已删除、已认领”且状态更新时间早于 `days` 天前的数据条数。
+- 说明：统计“已认领、已归档、已取消、已驳回”且状态更新时间早于 `days` 天前的数据条数。
 - Response `data` 示例：
 ```json
 {
   "days": 7,
   "count": 35,
-  "statuses": ["已归档", "已删除", "已认领"]
+  "statuses": ["已认领", "已归档", "已取消", "已驳回"]
 }
 ```
 
@@ -229,19 +232,27 @@ Base URL: `http://localhost:8080`
 ```json
 { "days": 7 }
 ```
-- 说明：删除“已归档、已删除、已认领”且状态更新时间早于 `days` 天前的数据。
+- 说明：删除“已认领、已归档、已取消、已驳回”且状态更新时间早于 `days` 天前的数据。
 - Response `data` 示例：
 ```json
 {
   "days": 7,
   "cleanedCount": 35,
-  "statuses": ["已归档", "已删除", "已认领"]
+  "statuses": ["已认领", "已归档", "已取消", "已驳回"]
 }
 ```
 
 ---
 
-## 7. Swagger 文档
+## 7. 系统通知接口 `/api/notifications`
+
+### 7.1 我的系统通知（分页）
+- **GET** `/api/notifications?page=0&size=8`
+- 说明：普通用户/管理员可用，`size` 最大 8。
+
+---
+
+## 8. Swagger 文档
 - `http://localhost:8080/swagger-ui.html`
 
 ## 角色说明

@@ -56,6 +56,12 @@ public class LostItem {
     @Column(length = 100)
     private String archiveMethod;
 
+    @Column(length = 200)
+    private String archiveLocation;
+
+    @Column(length = 1000)
+    private String archiveImageUrls;
+
     private Double reward;
 
     @ManyToOne(fetch = FetchType.EAGER)
@@ -100,6 +106,10 @@ public class LostItem {
     public void setStorageLocation(String storageLocation) { this.storageLocation = storageLocation; }
     public String getArchiveMethod() { return archiveMethod; }
     public void setArchiveMethod(String archiveMethod) { this.archiveMethod = archiveMethod; }
+    public String getArchiveLocation() { return archiveLocation; }
+    public void setArchiveLocation(String archiveLocation) { this.archiveLocation = archiveLocation; }
+    public String getArchiveImageUrls() { return archiveImageUrls; }
+    public void setArchiveImageUrls(String archiveImageUrls) { this.archiveImageUrls = archiveImageUrls; }
     public Double getReward() { return reward; }
     public void setReward(Double reward) { this.reward = reward; }
     public User getCreator() { return creator; }

@@ -398,7 +398,7 @@ Router.register('superAccounts', function (app) {
               <label>发送给全体用户</label>
               <input type="checkbox" id="notifyAll" />
             </div>
-            <select id="notifyTarget" style="width:100%;max-width:520px;padding:6px 10px;border:1px solid #ccc"></select>
+            <select id="notifyTarget" multiple size="8" style="width:100%;max-width:520px;padding:6px 10px;border:1px solid #ccc"></select>
             <div style="margin-top:24px">
               <h3 style="margin-bottom:10px">发布内容</h3>
               <textarea id="notifyContent" style="width:100%;min-height:220px;border:1px solid #ccc;padding:8px" placeholder="请输入发布系统通知内容"></textarea>
@@ -417,13 +417,20 @@ Router.register('superAccounts', function (app) {
       `;
 
       let users = [];
-      let selectedId = '';
+      const selectedIds = new Set();
 
       function renderSelect() {
         const select = document.getElementById('notifyTarget');
-        const options = users.map(u => `<option value="${u.id}">${esc(u.username || '')}</option>`).join('');
+        const options = users.map(u => `<option value="${u.id}" ${selectedIds.has(String(u.id)) ? 'selected' : ''}>${esc(u.username || '')}</option>`).join('');
         select.innerHTML = options || '<option value="">暂无用户</option>';
-        if (selectedId) select.value = selectedId;
+      }
+
+      function syncSetFromSelect() {
+        const select = document.getElementById('notifyTarget');
+        selectedIds.clear();
+        Array.from(select.selectedOptions || []).forEach(opt => {
+          if (opt.value) selectedIds.add(String(opt.value));
+        });
       }
 
       function renderUserList() {
@@ -433,15 +440,17 @@ Router.register('superAccounts', function (app) {
           ? '<div style="padding:10px;color:#888">暂无用户</div>'
           : list.map(u => `
             <div data-id="${u.id}" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid #eee;cursor:pointer">
-              <input type="radio" name="notifyUser" ${String(u.id) === String(selectedId) ? 'checked' : ''} />
+              <input type="checkbox" ${selectedIds.has(String(u.id)) ? 'checked' : ''} />
               <span style="width:30px;color:#666">${u.id}</span>
               <span>${esc(u.username || '')}</span>
             </div>
           `).join('');
         document.querySelectorAll('#notifyUserList [data-id]').forEach(row => {
           row.onclick = () => {
-            selectedId = row.dataset.id;
-            document.getElementById('notifyTarget').value = selectedId;
+            const id = String(row.dataset.id);
+            if (selectedIds.has(id)) selectedIds.delete(id);
+            else selectedIds.add(id);
+            renderSelect();
             renderUserList();
           };
         });
@@ -452,7 +461,6 @@ Router.register('superAccounts', function (app) {
           const data = await api('/api/super/users?role=&page=0&size=200');
           const page = data.data;
           users = (page.content || []).filter(u => u.role !== 'SUPER_ADMIN');
-          if (!selectedId && users[0]) selectedId = String(users[0].id);
           renderSelect();
           renderUserList();
         } catch (e) {
@@ -461,8 +469,8 @@ Router.register('superAccounts', function (app) {
       }
 
       document.getElementById('notifyFilter').oninput = renderUserList;
-      document.getElementById('notifyTarget').onchange = e => {
-        selectedId = e.target.value;
+      document.getElementById('notifyTarget').onchange = () => {
+        syncSetFromSelect();
         renderUserList();
       };
       document.getElementById('notifyAll').onchange = e => {
@@ -480,12 +488,14 @@ Router.register('superAccounts', function (app) {
           const content = document.getElementById('notifyContent').value.trim();
           const all = document.getElementById('notifyAll').checked;
           if (!content) throw new Error('请输入通知内容');
-          if (!all && !selectedId) throw new Error('请选择目标用户');
+          if (!all && selectedIds.size === 0) throw new Error('请至少选择一个目标用户');
+          const ids = Array.from(selectedIds).map(id => Number(id)).filter(id => !Number.isNaN(id));
           await api('/api/super/notifications', {
             method: 'POST',
             body: JSON.stringify({
               scope: all ? 'ALL' : 'USER',
-              targetUserId: all ? null : selectedId,
+              targetUserId: all ? null : (ids.length === 1 ? ids[0] : null),
+              targetUserIds: all ? [] : ids,
               content
             })
           });
@@ -544,42 +554,36 @@ Router.register('superAnno', function (app) {
           </div>
           <p id="globalAnnoMsg" class="msg" style="margin-top:12px"></p>
         </div>
-        <div id="globalAnnoConfirm" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center">
+        <div id="globalAnnoSuccess" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center">
           <div style="background:#fff;padding:24px;border-radius:8px;min-width:320px;box-shadow:0 4px 20px rgba(0,0,0,0.15)">
-            <div style="font-weight:bold;margin-bottom:8px">是否确定发送</div>
+            <div style="font-weight:bold;margin-bottom:8px">发送成功</div>
             <div style="text-align:right;margin-top:12px">
-              <button class="btn-sm" id="globalAnnoCancel" style="margin-right:8px">否</button>
-              <button class="btn-sm btn-danger" id="globalAnnoConfirmSend">是</button>
+              <button class="btn-sm btn-danger" id="globalAnnoSuccessConfirm">确认</button>
             </div>
           </div>
         </div>
       `;
 
-      const confirmBox = document.getElementById('globalAnnoConfirm');
+      const successBox = document.getElementById('globalAnnoSuccess');
       document.getElementById('globalAnnoClear').onclick = () => {
         document.getElementById('globalAnnoTitle').value = '';
         document.getElementById('globalAnnoContent').value = '';
       };
-      document.getElementById('globalAnnoSend').onclick = () => {
-        document.getElementById('globalAnnoMsg').textContent = '';
-        confirmBox.style.display = 'flex';
-      };
-      document.getElementById('globalAnnoCancel').onclick = () => { confirmBox.style.display = 'none'; };
-      confirmBox.addEventListener('click', function (e) { if (e.target === this) this.style.display = 'none'; });
-      document.getElementById('globalAnnoConfirmSend').onclick = async () => {
+      document.getElementById('globalAnnoSend').onclick = async () => {
         try {
           const title = document.getElementById('globalAnnoTitle').value.trim();
           const content = document.getElementById('globalAnnoContent').value.trim();
+          document.getElementById('globalAnnoMsg').textContent = '';
           await api('/api/super/announcements', { method: 'POST', body: JSON.stringify({ title, content }) });
-          document.getElementById('globalAnnoMsg').textContent = '发送成功！点击任意处返回';
-          document.getElementById('globalAnnoMsg').className = 'msg msg-ok';
-          confirmBox.style.display = 'none';
-          document.getElementById('globalAnnoTitle').value = '';
-          document.getElementById('globalAnnoContent').value = '';
+          successBox.style.display = 'flex';
         } catch (e) {
           document.getElementById('globalAnnoMsg').textContent = e.message;
           document.getElementById('globalAnnoMsg').className = 'msg msg-err';
         }
+      };
+      document.getElementById('globalAnnoSuccessConfirm').onclick = () => {
+        successBox.style.display = 'none';
+        renderTab();
       };
       return;
     }
@@ -943,7 +947,7 @@ Router.register('superBackup', function (app) {
       <div style="border:1px solid #bbb;background:#f5f5f5;padding:26px 30px;min-height:145px;margin-top:22px">
         <button class="btn-outline" id="cleanupBtn" style="min-width:130px">删除过期数据</button>
         <div style="margin-top:20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <b style="font-size:30px;transform:scale(0.5);transform-origin:left center;white-space:nowrap">清理时间：已归档、已删除、已认领后</b>
+          <b style="font-size:30px;transform:scale(0.5);transform-origin:left center;white-space:nowrap">清理时间：已认领、已归档、已取消、已驳回后</b>
           <input id="cleanupDays" type="number" min="1" value="7" style="width:70px;height:30px;padding:0 8px;border:1px solid #bbb;border-radius:3px" />
           <b style="font-size:30px;transform:scale(0.5);transform-origin:left center;white-space:nowrap">天</b>
         </div>

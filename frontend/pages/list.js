@@ -228,6 +228,7 @@ Router.register('sysNotify', async function (app) {
       <label>消息类型</label>
       <select id="nType">
         <option value="">所有</option>
+        <option value="系统消息">系统消息</option>
         <option value="归还申请">归还申请</option>
         <option value="认领申请">认领申请</option>
         <option value="失物招领">失物招领</option>
@@ -243,6 +244,7 @@ Router.register('sysNotify', async function (app) {
       </select>
     </div>
     <div id="sysNotifyList"></div>
+    <div id="sysNotifyPager" class="pager"></div>
   `;
 
   const STATUS_MAP = {
@@ -284,7 +286,7 @@ Router.register('sysNotify', async function (app) {
     const chatMatch = object.match(/聊天消息#?(\d+)?/);
     const isReport = event.includes('举报');
 
-    let type = '失物招领';
+    let type = '系统消息';
     if (isReport) {
       type = '举报';
     } else if (claimMatch) {
@@ -293,6 +295,10 @@ Router.register('sysNotify', async function (app) {
       type = postMatch[1];
     } else if (event.includes('申请')) {
       type = '认领申请';
+    } else if (object.includes('寻物启事')) {
+      type = '寻物启事';
+    } else if (object.includes('失物招领')) {
+      type = '失物招领';
     }
 
     const itemName = postMatch ? postMatch[2] : (claimMatch ? claimMatch[2] : '');
@@ -338,17 +344,21 @@ Router.register('sysNotify', async function (app) {
     return Date.now() - t <= Number(days) * 24 * 60 * 60 * 1000;
   }
 
-  try {
-    const data = await api('/api/notifications');
-    const rawList = data.data || [];
-    const list = rawList.map(n => ({
-      ...n,
-      __parsed: parseNotify(n.content || '')
-    }));
+  let pageIndex = 0;
 
-    function render() {
+  async function loadNotifications() {
+    try {
       const type = document.getElementById('nType').value;
       const days = document.getElementById('nTime').value;
+      const params = new URLSearchParams({ page: String(pageIndex), size: '8' });
+      const data = await api(`/api/notifications?${params.toString()}`);
+      const page = data.data || {};
+      const rawList = page.content || [];
+      const totalPages = page.totalPages || 1;
+      const list = rawList.map(n => ({
+        ...n,
+        __parsed: parseNotify(n.content || '')
+      }));
 
       const filtered = list.filter(n => {
         const p = n.__parsed;
@@ -394,13 +404,15 @@ Router.register('sysNotify', async function (app) {
       document.querySelectorAll('.notify-chat-link').forEach(btn => {
         btn.onclick = () => Router.go('myChat');
       });
+      renderPager(document.getElementById('sysNotifyPager'), pageIndex, totalPages, p => { pageIndex = p; loadNotifications(); });
+    } catch (e) {
+      document.getElementById('sysNotifyList').innerHTML = `<p class="empty">${e.message}</p>`;
+      document.getElementById('sysNotifyPager').innerHTML = '';
     }
-
-    ['nType', 'nTime'].forEach(id => {
-      document.getElementById(id).onchange = render;
-    });
-    render();
-  } catch (e) {
-    document.getElementById('sysNotifyList').innerHTML = `<p class="empty">${e.message}</p>`;
   }
+
+  ['nType', 'nTime'].forEach(id => {
+    document.getElementById(id).onchange = () => { pageIndex = 0; loadNotifications(); };
+  });
+  loadNotifications();
 });
