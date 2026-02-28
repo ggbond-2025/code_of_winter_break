@@ -54,9 +54,9 @@ public class SuperAdminController {
     }
 
     @PostMapping("/users")
-    public ApiResponse<User> createAdmin(@RequestBody CreateAdminRequest req, HttpServletRequest servletRequest) {
+    public ApiResponse<User> createUser(@RequestBody CreateUserRequest req, HttpServletRequest servletRequest) {
         requireSuperAdmin(servletRequest);
-        return ApiResponse.ok(superAdminService.createAdmin(req.username(), req.password(), req.realName(), req.phone(), req.region()));
+        return ApiResponse.ok(superAdminService.createUser(req.username(), req.password(), req.realName(), req.phone(), req.region(), req.role()));
     }
 
     @PutMapping("/users/{id}/toggle")
@@ -134,10 +134,10 @@ public class SuperAdminController {
         return ApiResponse.ok("备份完成", superAdminService.backupNow());
     }
 
-    @PostMapping("/export/sql")
-    public ApiResponse<Map<String, Object>> exportSql(@RequestBody ExportSqlRequest req, HttpServletRequest servletRequest) {
+    @PostMapping("/export/csv")
+    public ApiResponse<Map<String, Object>> exportCsv(@RequestBody ExportDataRequest req, HttpServletRequest servletRequest) {
         requireSuperAdmin(servletRequest);
-        return ApiResponse.ok("导出完成", superAdminService.exportDataSql(req.rangeMonths(), req.types()));
+        return ApiResponse.ok("导出完成", superAdminService.exportDataCsv(req.rangeMonths(), req.types()));
     }
 
     @GetMapping("/cleanup/preview")
@@ -225,10 +225,10 @@ public class SuperAdminController {
         return ApiResponse.ok(complaintService.reject(userId, id));
     }
 
-    public record CreateAdminRequest(@NotBlank String username, @NotBlank String password, String realName, String phone, String region) {}
+    public record CreateUserRequest(@NotBlank String username, @NotBlank String password, String realName, String phone, String region, String role) {}
     public record AnnouncementRequest(@NotBlank String title, @NotBlank String content) {}
     public record ResolveComplaintRequest(@NotBlank String action) {}
     public record SendNotificationRequest(Long targetUserId, List<Long> targetUserIds, String scope, @NotBlank String content) {}
-    public record ExportSqlRequest(Integer rangeMonths, List<String> types) {}
+    public record ExportDataRequest(Integer rangeMonths, List<String> types) {}
     public record CleanupRequest(Integer days) {}
 }

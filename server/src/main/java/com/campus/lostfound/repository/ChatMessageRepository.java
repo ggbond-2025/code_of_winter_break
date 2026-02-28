@@ -19,4 +19,5 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
                                                                                                                 @Param("userId") Long userId,
                                                                                                                 @Param("peerId") Long peerId);
         void deleteByClaimIdIn(java.util.Collection<Long> claimIds);
+        long countByClaimIdAndSenderId(Long claimId, Long senderId);
 }

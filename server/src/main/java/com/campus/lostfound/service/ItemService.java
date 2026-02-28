@@ -10,9 +10,9 @@ public interface ItemService {
                     String contactName, String contactPhone,
                     String features, String imageUrls, Double reward, String storageLocation);
 
-    Page<LostItem> publicList(String keyword, String status, String category, String type, String location, int page, int size);
+    Page<LostItem> publicList(String keyword, String status, String category, String type, String location, int page, int size, Long viewerId);
 
-    LostItem getById(Long id);
+    LostItem getById(Long id, Long viewerId);
 
     Page<LostItem> myItems(Long userId, int page, int size);
 

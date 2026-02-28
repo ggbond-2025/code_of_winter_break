@@ -11,7 +11,7 @@ public interface SuperAdminService {
 
     Page<User> listUsers(String keyword, String role, int page, int size);
 
-    User createAdmin(String username, String password, String realName, String phone, String region);
+    User createUser(String username, String password, String realName, String phone, String region, String role);
 
     User toggleUser(Long userId);
 
@@ -37,7 +37,7 @@ public interface SuperAdminService {
 
     Map<String, Object> backupNow();
 
-    Map<String, Object> exportDataSql(Integer rangeMonths, List<String> types);
+    Map<String, Object> exportDataCsv(Integer rangeMonths, List<String> types);
 
     Map<String, Object> previewExpiredCleanup(Integer days);
 

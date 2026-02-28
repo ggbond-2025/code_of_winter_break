@@ -12,9 +12,12 @@ public interface ComplaintRecordRepository extends JpaRepository<ComplaintRecord
     Page<ComplaintRecord> findByStatusOrderByCreatedAtDesc(String status, Pageable pageable);
     Page<ComplaintRecord> findAllByOrderByCreatedAtDesc(Pageable pageable);
     long countByTargetId(Long targetId);
-    boolean existsByReporterIdAndComplaintTypeAndItemId(Long reporterId, String complaintType, Long itemId);
-    boolean existsByReporterIdAndComplaintTypeAndClaimId(Long reporterId, String complaintType, Long claimId);
-    boolean existsByReporterIdAndComplaintTypeAndChatMessageId(Long reporterId, String complaintType, Long chatMessageId);
+    boolean existsByReporterIdAndComplaintTypeAndItemIdAndStatusNot(Long reporterId, String complaintType, Long itemId, String status);
+    boolean existsByReporterIdAndComplaintTypeAndClaimIdAndStatusNot(Long reporterId, String complaintType, Long claimId, String status);
+    boolean existsByReporterIdAndComplaintTypeAndChatMessageIdAndStatusNot(Long reporterId, String complaintType, Long chatMessageId, String status);
+    ComplaintRecord findTopByReporterIdAndComplaintTypeAndItemIdOrderByCreatedAtDesc(Long reporterId, String complaintType, Long itemId);
+    ComplaintRecord findTopByReporterIdAndComplaintTypeAndClaimIdOrderByCreatedAtDesc(Long reporterId, String complaintType, Long claimId);
+    ComplaintRecord findTopByReporterIdAndComplaintTypeAndChatMessageIdOrderByCreatedAtDesc(Long reporterId, String complaintType, Long chatMessageId);
     long countByItemId(Long itemId);
     @Modifying
     @Query("update ComplaintRecord c set c.item = null where c.item is not null and c.item.id = :itemId")

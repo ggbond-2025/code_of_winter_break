@@ -1,5 +1,7 @@
 package com.campus.lostfound.config;
 
+import com.campus.lostfound.model.User;
+import com.campus.lostfound.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -10,9 +12,11 @@ import org.springframework.web.servlet.HandlerInterceptor;
 public class AuthInterceptor implements HandlerInterceptor {
 
     private final StringRedisTemplate redisTemplate;
+    private final UserRepository userRepository;
 
-    public AuthInterceptor(StringRedisTemplate redisTemplate) {
+    public AuthInterceptor(StringRedisTemplate redisTemplate, UserRepository userRepository) {
         this.redisTemplate = redisTemplate;
+        this.userRepository = userRepository;
     }
 
     private static final java.util.Set<String> PUBLIC_PATHS = java.util.Set.of(
@@ -28,9 +32,25 @@ public class AuthInterceptor implements HandlerInterceptor {
             String token = authHeader.substring(7);
             String userId = redisTemplate.opsForValue().get("lf:token:" + token);
             if (userId != null) {
+                Long uid;
+                try {
+                    uid = Long.parseLong(userId);
+                } catch (NumberFormatException ex) {
+                    redisTemplate.delete("lf:token:" + token);
+                    redisTemplate.delete("lf:role:" + token);
+                    reject(response, "登录已失效");
+                    return false;
+                }
+                User user = userRepository.findById(uid).orElse(null);
+                if (user == null || !user.isEnabled()) {
+                    redisTemplate.delete("lf:token:" + token);
+                    redisTemplate.delete("lf:role:" + token);
+                    reject(response, "账号已被禁用");
+                    return false;
+                }
                 String role = redisTemplate.opsForValue().get("lf:role:" + token);
-                request.setAttribute("loginUserId", Long.parseLong(userId));
-                request.setAttribute("loginUserRole", role != null ? role : "USER");
+                request.setAttribute("loginUserId", uid);
+                request.setAttribute("loginUserRole", role != null ? role : user.getRole());
                 return true;
             }
         }

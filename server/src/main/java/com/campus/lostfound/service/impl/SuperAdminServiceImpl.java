@@ -95,14 +95,18 @@ public class SuperAdminServiceImpl implements SuperAdminService {
     }
 
     @Override
-    public User createAdmin(String username, String password, String realName, String phone, String region) {
+    public User createUser(String username, String password, String realName, String phone, String region, String role) {
         if (userRepository.findByUsername(username).isPresent()) {
             throw new IllegalArgumentException("用户名已存在");
+        }
+        String normalizedRole = role == null ? "ADMIN" : role.trim().toUpperCase();
+        if (!"ADMIN".equals(normalizedRole) && !"USER".equals(normalizedRole)) {
+            throw new IllegalArgumentException("仅支持创建 ADMIN 或 USER 账号");
         }
         User user = new User();
         user.setUsername(username);
         user.setPassword(passwordEncoder.encode(password));
-        user.setRole("ADMIN");
+        user.setRole(normalizedRole);
         user.setRealName(realName);
         user.setPhone(phone);
         user.setRegion(region);
@@ -269,7 +273,7 @@ public class SuperAdminServiceImpl implements SuperAdminService {
     }
 
     @Override
-    public Map<String, Object> exportDataSql(Integer rangeMonths, List<String> types) {
+    public Map<String, Object> exportDataCsv(Integer rangeMonths, List<String> types) {
         Set<Integer> validMonths = Set.of(1, 2, 4, 8, 12);
         if (rangeMonths == null || !validMonths.contains(rangeMonths)) {
             throw new IllegalArgumentException("导出时间范围仅支持：1个月、2个月、4个月、8个月、1年");
@@ -289,7 +293,7 @@ public class SuperAdminServiceImpl implements SuperAdminService {
 
         LocalDateTime since = LocalDateTime.now().minusMonths(rangeMonths);
         Path exportDir;
-        String filename = "data-export-" + LocalDateTime.now().format(BACKUP_DIR_FORMATTER) + "-" + UUID.randomUUID().toString().substring(0, 8) + ".sql";
+        String filename = "data-export-" + LocalDateTime.now().format(BACKUP_DIR_FORMATTER) + "-" + UUID.randomUUID().toString().substring(0, 8) + ".csv";
         try {
             exportDir = Paths.get(uploadDir).toAbsolutePath().normalize().resolve("exports");
             Files.createDirectories(exportDir);
@@ -302,16 +306,16 @@ public class SuperAdminServiceImpl implements SuperAdminService {
         List<String> exportedSections = new ArrayList<>();
         try (Connection conn = dataSource.getConnection();
              BufferedWriter writer = Files.newBufferedWriter(outFile, StandardCharsets.UTF_8)) {
-            writer.write("-- 数据导出文件\n");
-            writer.write("-- 生成时间: " + LocalDateTime.now().format(DISPLAY_FORMATTER) + "\n");
-            writer.write("-- 时间范围: 最近" + rangeMonths + "个月\n\n");
+            writer.write("数据类型,表名,导出时间,时间范围\n");
+            writer.write(csvValue("元数据") + "," + csvValue("-") + "," + csvValue(LocalDateTime.now().format(DISPLAY_FORMATTER)) + "," + csvValue("最近" + rangeMonths + "个月") + "\n\n");
 
             if (selectedTypes.contains("FOUND") || selectedTypes.contains("LOST")) {
                 List<String> itemTypes = new ArrayList<>();
                 if (selectedTypes.contains("FOUND")) itemTypes.add("FOUND");
                 if (selectedTypes.contains("LOST")) itemTypes.add("LOST");
-                int count = exportRowsByQuery(
+                int count = exportRowsAsCsv(
                         conn,
+                        "物品数据",
                         "lost_items",
                         buildInQuery("SELECT * FROM `lost_items` WHERE `created_at` >= ? AND `type` IN (%s) ORDER BY `created_at` DESC", itemTypes.size()),
                         combineParams(since, itemTypes),
@@ -326,8 +330,9 @@ public class SuperAdminServiceImpl implements SuperAdminService {
                 List<String> scopes = new ArrayList<>();
                 if (selectedTypes.contains("GLOBAL_ANNOUNCEMENT")) scopes.add("GLOBAL");
                 if (selectedTypes.contains("REGION_ANNOUNCEMENT")) scopes.add("REGION");
-                int count = exportRowsByQuery(
+                int count = exportRowsAsCsv(
                         conn,
+                    "公告数据",
                         "announcements",
                         buildInQuery("SELECT * FROM `announcements` WHERE `created_at` >= ? AND `scope` IN (%s) ORDER BY `created_at` DESC", scopes.size()),
                         combineParams(since, scopes),
@@ -525,6 +530,60 @@ public class SuperAdminServiceImpl implements SuperAdminService {
         }
         writer.write("\n");
         return rows;
+    }
+
+    private int exportRowsAsCsv(Connection conn, String dataType, String tableName, String querySql, List<Object> params, BufferedWriter writer) throws SQLException, IOException {
+        int rows = 0;
+        try (PreparedStatement ps = conn.prepareStatement(querySql)) {
+            for (int i = 0; i < params.size(); i++) {
+                Object p = params.get(i);
+                if (p instanceof LocalDateTime dt) {
+                    ps.setObject(i + 1, dt);
+                } else {
+                    ps.setObject(i + 1, p);
+                }
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                ResultSetMetaData md = rs.getMetaData();
+                int colCount = md.getColumnCount();
+
+                writer.write(csvValue("数据段") + "," + csvValue(dataType) + "," + csvValue(tableName) + "\n");
+                StringBuilder header = new StringBuilder();
+                for (int i = 1; i <= colCount; i++) {
+                    if (i > 1) header.append(',');
+                    header.append(csvValue(md.getColumnName(i)));
+                }
+                writer.write(header + "\n");
+
+                while (rs.next()) {
+                    rows++;
+                    StringBuilder line = new StringBuilder();
+                    for (int i = 1; i <= colCount; i++) {
+                        if (i > 1) line.append(',');
+                        Object value = rs.getObject(i);
+                        line.append(csvValue(formatCsvValue(value)));
+                    }
+                    writer.write(line + "\n");
+                }
+                writer.write("\n");
+            }
+        }
+        return rows;
+    }
+
+    private String formatCsvValue(Object value) {
+        if (value == null) return "";
+        if (value instanceof Date date) {
+            return LocalDateTime.ofInstant(date.toInstant(), ZoneId.systemDefault())
+                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        }
+        if (value instanceof byte[] bytes) return toHex(bytes);
+        return value.toString();
+    }
+
+    private String csvValue(String value) {
+        String text = value == null ? "" : value;
+        return "\"" + text.replace("\"", "\"\"") + "\"";
     }
 
     private String buildInQuery(String basePattern, int count) {

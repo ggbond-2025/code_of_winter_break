@@ -46,7 +46,8 @@ public class ClaimController {
         Long userId = (Long) servletRequest.getAttribute("loginUserId");
         List<ClaimRecord> claims = claimService.myClaims(userId);
         List<MyClaimProgress> mapped = claims.stream()
-                .map(c -> new MyClaimProgress(c.getId(), c.getStatus(), c.getItem() != null ? c.getItem().getStatus() : c.getStatus(), c.getItem()))
+            .peek(c -> maskClaimItemStorage(c, userId))
+            .map(c -> new MyClaimProgress(c.getId(), c.getStatus(), c.getItem() != null ? c.getItem().getStatus() : c.getStatus(), c.getItem()))
                 .collect(Collectors.toList());
         int from = Math.min(page * size, mapped.size());
         int to = Math.min(from + size, mapped.size());
@@ -63,6 +64,7 @@ public class ClaimController {
         Long userId = (Long) servletRequest.getAttribute("loginUserId");
         if (userId == null) throw new IllegalArgumentException("请先登录");
         List<ClaimRecord> claims = claimService.myClaims(userId);
+        claims.forEach(c -> maskClaimItemStorage(c, userId));
         int from = Math.min(page * size, claims.size());
         int to = Math.min(from + size, claims.size());
         Page<ClaimRecord> res = new PageImpl<>(claims.subList(from, to), PageRequest.of(page, size), claims.size());
@@ -73,14 +75,18 @@ public class ClaimController {
     public ApiResponse<ClaimRecord> myClaimForItem(@PathVariable Long itemId, HttpServletRequest servletRequest) {
         Long userId = (Long) servletRequest.getAttribute("loginUserId");
         if (userId == null) throw new IllegalArgumentException("请先登录");
-        return ApiResponse.ok(claimService.getMyClaimForItem(userId, itemId));
+        ClaimRecord record = claimService.getMyClaimForItem(userId, itemId);
+        maskClaimItemStorage(record, userId);
+        return ApiResponse.ok(record);
     }
 
     @GetMapping("/item/{itemId}")
     public ApiResponse<List<ClaimRecord>> claimsForItem(@PathVariable Long itemId, HttpServletRequest servletRequest) {
         Long userId = (Long) servletRequest.getAttribute("loginUserId");
         String role = (String) servletRequest.getAttribute("loginUserRole");
-        return ApiResponse.ok(claimService.claimsForItem(userId, role, itemId));
+        List<ClaimRecord> claims = claimService.claimsForItem(userId, role, itemId);
+        claims.forEach(c -> maskClaimItemStorage(c, userId));
+        return ApiResponse.ok(claims);
     }
 
     @PutMapping("/{id}/review")
@@ -100,6 +106,7 @@ public class ClaimController {
         List<ClaimRecord> claims = claimService.myMatchedChats(userId);
         Map<Long, ChatGroup> grouped = new LinkedHashMap<>();
         for (ClaimRecord claim : claims) {
+            maskClaimItemStorage(claim, userId);
             LostItem item = claim.getItem();
             ChatGroup group = grouped.get(item.getId());
             if (group == null) {
@@ -118,7 +125,30 @@ public class ClaimController {
     @GetMapping("/{claimId}")
     public ApiResponse<ClaimRecord> getClaimDetail(@PathVariable Long claimId, HttpServletRequest servletRequest) {
         Long userId = (Long) servletRequest.getAttribute("loginUserId");
-        return ApiResponse.ok(claimService.getClaimDetail(userId, claimId));
+        ClaimRecord record = claimService.getClaimDetail(userId, claimId);
+        maskClaimItemStorage(record, userId);
+        return ApiResponse.ok(record);
+    }
+
+    private void maskClaimItemStorage(ClaimRecord claim, Long viewerId) {
+        if (claim == null) return;
+        LostItem item = claim.getItem();
+        if (item == null) return;
+        if (!"FOUND".equals(item.getType())) return;
+        if (item.getStorageLocation() == null || item.getStorageLocation().isBlank()) return;
+        if (canViewStorageLocation(claim, viewerId)) return;
+        item.setStorageLocation(null);
+    }
+
+    private boolean canViewStorageLocation(ClaimRecord claim, Long viewerId) {
+        if (claim == null || viewerId == null) return false;
+        LostItem item = claim.getItem();
+        if (item != null && item.getCreator() != null && viewerId.equals(item.getCreator().getId())) {
+            return true;
+        }
+        return claim.getClaimer() != null
+                && viewerId.equals(claim.getClaimer().getId())
+                && "APPROVED".equals(claim.getStatus());
     }
 
     @PostMapping("/{claimId}/messages")

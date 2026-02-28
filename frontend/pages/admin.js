@@ -4,20 +4,32 @@ Router.register('admin', function (app) {
 
 Router.register('adminHome', function (app) {
   const main = renderLayout(app, 'ADMIN', 'adminHome');
-  main.innerHTML = `<h2 style="text-align:center;margin-top:60px"><b>管理员${esc(Auth.getUser())}，欢迎登录失物招领系统</b></h2>`;
+  main.innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:60vh;animation:scaleUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards">
+      <div style="font-size:64px;margin-bottom:24px">👋</div>
+      <h2 style="font-size:32px;font-weight:800;color:var(--text-main);letter-spacing:-0.02em;margin-bottom:16px">管理员 ${esc(Auth.getUser())}，欢迎回来</h2>
+      <p style="font-size:16px;color:var(--text-muted)">请在左侧菜单选择需要进行的操作</p>
+    </div>
+  `;
 });
 
 Router.register('adminReview', function (app) {
   const main = renderLayout(app, 'ADMIN', 'adminReview');
   main.innerHTML = `
-    <h2 style="text-align:center;margin-bottom:20px">待审核消息</h2>
-    <div class="tab-bar">
-      <button class="tab-btn active" data-rtab="FOUND">失物招领</button>
-      <button class="tab-btn" data-rtab="LOST">寻物启事</button>
-      <button class="tab-btn" data-rtab="CLAIM">申请</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;animation:fadeIn 0.3s ease">
+      <h2 style="margin:0;font-size:24px;font-weight:700;color:var(--text-main)">待审核消息</h2>
     </div>
-    <div id="reviewList"></div>
-    <div id="reviewPager" class="pager"></div>
+    <div class="tab-bar" style="display:flex;gap:16px;margin-bottom:24px;border-bottom:2px solid var(--border);padding-bottom:12px;animation:fadeIn 0.3s ease">
+      <button class="tab-btn active" data-rtab="FOUND" style="padding:8px 24px;background:transparent;border:none;font-size:16px;font-weight:600;color:var(--text-muted);cursor:pointer;position:relative;transition:all 0.3s ease" onmouseover="if(!this.classList.contains('active'))this.style.color='var(--primary)'" onmouseout="if(!this.classList.contains('active'))this.style.color='var(--text-muted)'">失物招领</button>
+      <button class="tab-btn" data-rtab="LOST" style="padding:8px 24px;background:transparent;border:none;font-size:16px;font-weight:600;color:var(--text-muted);cursor:pointer;position:relative;transition:all 0.3s ease" onmouseover="if(!this.classList.contains('active'))this.style.color='var(--primary)'" onmouseout="if(!this.classList.contains('active'))this.style.color='var(--text-muted)'">寻物启事</button>
+      <button class="tab-btn" data-rtab="CLAIM" style="padding:8px 24px;background:transparent;border:none;font-size:16px;font-weight:600;color:var(--text-muted);cursor:pointer;position:relative;transition:all 0.3s ease" onmouseover="if(!this.classList.contains('active'))this.style.color='var(--primary)'" onmouseout="if(!this.classList.contains('active'))this.style.color='var(--text-muted)'">申请</button>
+    </div>
+    <style>
+      .tab-btn.active { color: var(--primary) !important; }
+      .tab-btn.active::after { content: ''; position: absolute; bottom: -14px; left: 0; width: 100%; height: 3px; background: var(--primary); border-radius: 3px 3px 0 0; }
+    </style>
+    <div id="reviewList" style="display:flex;flex-direction:column;gap:20px"></div>
+    <div id="reviewPager" class="pager" style="margin-top:32px"></div>
   `;
 
   let currentTab = 'FOUND';
@@ -62,25 +74,27 @@ Router.register('adminReview', function (app) {
       const page = data.data;
       const list = page.content || [];
       document.getElementById('reviewList').innerHTML = list.length === 0
-        ? '<p class="empty">暂无待审核消息</p>'
+        ? '<p class="empty" style="text-align:center;padding:40px;color:var(--text-muted);background:var(--surface);border-radius:var(--radius-lg);box-shadow:0 4px 12px rgba(0,0,0,0.05)">暂无待审核消息</p>'
         : list.map(item => {
           const imgs = item.imageUrls ? item.imageUrls.split(',').filter(Boolean) : [];
           return `
-            <div class="review-card" data-review-item-id="${item.id}" style="cursor:pointer">
-              <div class="info-line">物品名称：${esc(item.title)}</div>
-              <div class="info-line">物品类型：${esc(item.category || '-')}</div>
-              <div class="info-line">${item.type === 'LOST' ? '丢失' : '拾取'}地点：${esc(item.location || '-')}</div>
-              <div class="info-line">${item.type === 'LOST' ? '丢失' : '拾得'}时间：${esc(item.lostTime || '-')}</div>
-              <div class="info-line">领取地点：${esc(item.storageLocation || '-')}</div>
-              <div class="info-line">联系方式：${esc((item.contactPhone || '') + ' ' + (item.contactName || ''))}</div>
-              <div class="info-line">物品介绍：${esc(item.description || item.features || '-')}</div>
-              <div class="review-images">
-                ${imgs.length > 0 ? imgs.slice(0, 3).map(u => imgTag(u, 140, 110)).join('') : '<div class="img-placeholder"></div><div class="img-placeholder"></div><div class="img-placeholder"></div>'}
+            <div class="review-card" data-review-item-id="${item.id}" style="background:var(--surface);border-radius:var(--radius-lg);padding:24px;box-shadow:0 4px 12px rgba(0,0,0,0.05);transition:all 0.3s ease;border-left:4px solid var(--primary);cursor:pointer;animation:fadeIn 0.3s ease" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 24px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='none';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.05)'">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;font-size:15px;color:var(--text-main)">
+                <div class="info-line"><b style="color:var(--text-muted)">物品名称：</b>${esc(item.title)}</div>
+                <div class="info-line"><b style="color:var(--text-muted)">物品类型：</b>${esc(item.category || '-')}</div>
+                <div class="info-line"><b style="color:var(--text-muted)">${item.type === 'LOST' ? '丢失' : '拾取'}地点：</b>${esc(item.location || '-')}</div>
+                <div class="info-line"><b style="color:var(--text-muted)">${item.type === 'LOST' ? '丢失' : '拾得'}时间：</b>${esc(item.lostTime || '-')}</div>
+                <div class="info-line"><b style="color:var(--text-muted)">领取地点：</b>${esc(item.storageLocation || '-')}</div>
+                <div class="info-line"><b style="color:var(--text-muted)">联系方式：</b>${esc((item.contactPhone || '') + ' ' + (item.contactName || ''))}</div>
               </div>
-              <div class="review-actions">
-                <button class="btn-outline" data-open-detail="${item.id}">查看详情</button>
-                <button class="btn-outline" data-approve="${item.id}">通过</button>
-                <button class="btn-outline" data-reject="${item.id}">驳回</button>
+              <div class="info-line" style="margin-bottom:16px;font-size:15px;color:var(--text-main);background:var(--bg-color);padding:12px;border-radius:var(--radius-md)"><b style="color:var(--text-muted)">物品介绍：</b>${esc(item.description || item.features || '-')}</div>
+              <div class="review-images" style="display:flex;gap:12px;margin-bottom:20px">
+                ${imgs.length > 0 ? imgs.slice(0, 3).map(u => `<img src="${imgUrl(u)}" style="width:120px;height:120px;object-fit:cover;border-radius:var(--radius-md);box-shadow:0 2px 8px rgba(0,0,0,0.05)" />`).join('') : '<div class="img-placeholder" style="width:120px;height:120px;background:var(--bg-color);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px">暂无图片</div>'}
+              </div>
+              <div class="review-actions" style="display:flex;gap:12px;justify-content:flex-end;border-top:1px solid var(--border);padding-top:16px">
+                <button class="btn-outline" data-open-detail="${item.id}" style="padding:8px 20px;background:transparent;color:var(--text-main);border:1px solid var(--border);border-radius:var(--radius-md);font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s ease" onmouseover="this.style.background='var(--bg-color)';this.style.borderColor='var(--text-muted)'" onmouseout="this.style.background='transparent';this.style.borderColor='var(--border)'">查看详情</button>
+                <button class="btn-outline" data-approve="${item.id}" style="padding:8px 20px;background:var(--success);color:#fff;border:none;border-radius:var(--radius-md);font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s ease;box-shadow:0 2px 8px rgba(var(--success-rgb), 0.3)" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(var(--success-rgb), 0.4)'" onmouseout="this.style.transform='none';this.style.boxShadow='0 2px 8px rgba(var(--success-rgb), 0.3)'">通过</button>
+                <button class="btn-outline" data-reject="${item.id}" style="padding:8px 20px;background:var(--danger);color:#fff;border:none;border-radius:var(--radius-md);font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s ease;box-shadow:0 2px 8px rgba(var(--danger-rgb), 0.3)" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(var(--danger-rgb), 0.4)'" onmouseout="this.style.transform='none';this.style.boxShadow='0 2px 8px rgba(var(--danger-rgb), 0.3)'">驳回</button>
               </div>
             </div>
           `;
@@ -99,7 +113,7 @@ Router.register('adminReview', function (app) {
       const list = data.data || [];
       document.getElementById('reviewPager').innerHTML = '';
       if (list.length === 0) {
-        document.getElementById('reviewList').innerHTML = '<p class="empty">暂无待审核申请</p>';
+        document.getElementById('reviewList').innerHTML = '<p class="empty" style="text-align:center;padding:40px;color:var(--text-muted);background:var(--surface);border-radius:var(--radius-lg);box-shadow:0 4px 12px rgba(0,0,0,0.05)">暂无待审核申请</p>';
         return;
       }
       document.getElementById('reviewList').innerHTML = list.map(c => {
@@ -107,16 +121,19 @@ Router.register('adminReview', function (app) {
         const imgs = item.imageUrls ? item.imageUrls.split(',').filter(Boolean) : [];
         const claimImgs = c.imageUrls ? c.imageUrls.split(',').filter(Boolean) : [];
         return `
-          <div class="review-card" data-claim-id="${c.id}">
-            <div class="info-line"><b>关联物品：</b>${esc(item.title || '-')}（${item.type === 'LOST' ? '寻物' : '招领'}）</div>
-            <div class="info-line"><b>申请人：</b>${esc(c.claimer?.username || '-')}</div>
-            <div class="info-line"><b>留言/证明：</b>${esc(c.message || '-')}</div>
-            ${claimImgs.length > 0 ? `<div class="info-line">证明材料图：</div><div style="display:flex;gap:6px;margin:6px 0">${claimImgs.map(u => imgTag(u, 80, 60)).join('')}</div>` : ''}
-            <div class="info-line">物品图：</div>
-            <div style="display:flex;gap:6px;margin:6px 0">${imgs.length > 0 ? imgs.slice(0, 3).map(u => imgTag(u, 80, 60)).join('') : '<span>无</span>'}</div>
-            <div class="review-actions" style="margin-top:12px">
-              <button class="btn-outline" data-claim-approve="${c.id}">通过（转发布者审核）</button>
-              <button class="btn-outline" data-claim-reject="${c.id}">驳回</button>
+          <div class="review-card" data-claim-id="${c.id}" style="background:var(--surface);border-radius:var(--radius-lg);padding:24px;box-shadow:0 4px 12px rgba(0,0,0,0.05);transition:all 0.3s ease;border-left:4px solid var(--warning);animation:fadeIn 0.3s ease" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 24px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='none';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.05)'">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;font-size:15px;color:var(--text-main)">
+              <div class="info-line"><b style="color:var(--text-muted)">关联物品：</b>${esc(item.title || '-')} <span style="background:rgba(var(--warning-rgb), 0.1);color:var(--warning);padding:2px 8px;border-radius:12px;font-size:12px;margin-left:8px">${item.type === 'LOST' ? '寻物' : '招领'}</span></div>
+              <div class="info-line"><b style="color:var(--text-muted)">申请人：</b>${esc(c.claimer?.username || '-')}</div>
+            </div>
+            <div class="info-line" style="margin-bottom:16px;font-size:15px;color:var(--text-main);background:var(--bg-color);padding:12px;border-radius:var(--radius-md)"><b style="color:var(--text-muted)">留言/证明：</b>${esc(c.message || '-')}</div>
+            <div style="display:flex;gap:24px;margin-bottom:20px">
+              ${claimImgs.length > 0 ? `<div><div class="info-line" style="font-size:14px;color:var(--text-muted);margin-bottom:8px">证明材料图：</div><div style="display:flex;gap:8px">${claimImgs.map(u => `<img src="${imgUrl(u)}" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-md);box-shadow:0 2px 8px rgba(0,0,0,0.05)" />`).join('')}</div></div>` : ''}
+              <div><div class="info-line" style="font-size:14px;color:var(--text-muted);margin-bottom:8px">物品图：</div><div style="display:flex;gap:8px">${imgs.length > 0 ? imgs.slice(0, 3).map(u => `<img src="${imgUrl(u)}" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-md);box-shadow:0 2px 8px rgba(0,0,0,0.05)" />`).join('') : '<span style="color:var(--text-muted);font-size:14px">无</span>'}</div></div>
+            </div>
+            <div class="review-actions" style="display:flex;gap:12px;justify-content:flex-end;border-top:1px solid var(--border);padding-top:16px">
+              <button class="btn-outline" data-claim-approve="${c.id}" style="padding:8px 20px;background:var(--success);color:#fff;border:none;border-radius:var(--radius-md);font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s ease;box-shadow:0 2px 8px rgba(var(--success-rgb), 0.3)" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(var(--success-rgb), 0.4)'" onmouseout="this.style.transform='none';this.style.boxShadow='0 2px 8px rgba(var(--success-rgb), 0.3)'">通过（转发布者审核）</button>
+              <button class="btn-outline" data-claim-reject="${c.id}" style="padding:8px 20px;background:var(--danger);color:#fff;border:none;border-radius:var(--radius-md);font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s ease;box-shadow:0 2px 8px rgba(var(--danger-rgb), 0.3)" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(var(--danger-rgb), 0.4)'" onmouseout="this.style.transform='none';this.style.boxShadow='0 2px 8px rgba(var(--danger-rgb), 0.3)'">驳回</button>
             </div>
           </div>
         `;
@@ -126,7 +143,7 @@ Router.register('adminReview', function (app) {
           try {
             await api(`/api/claims/${b.dataset.claimApprove}/review`, { method: 'PUT', body: JSON.stringify({ status: 'APPROVED', reason: '' }) });
             loadClaims();
-          } catch (e) { alert(e.message); }
+          } catch (e) { await uiAlert(e.message, '操作失败'); }
         };
       });
       document.querySelectorAll('[data-claim-reject]').forEach(b => {
@@ -135,7 +152,7 @@ Router.register('adminReview', function (app) {
             try {
               await api(`/api/claims/${b.dataset.claimReject}/review`, { method: 'PUT', body: JSON.stringify({ status: 'REJECTED', reason }) });
               loadClaims();
-            } catch (e) { alert(e.message); }
+            } catch (e) { await uiAlert(e.message, '操作失败'); }
           });
         };
       });
@@ -147,28 +164,24 @@ Router.register('adminReview', function (app) {
 
   function openRejectModal(onConfirm) {
     const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1100;display:flex;align-items:center;justify-content:center';
+    overlay.style.cssText = 'position:fixed;inset:0;background:transparent;z-index:1100;display:flex;align-items:center;justify-content:center';
     overlay.innerHTML = `
-      <div style="background:#fff;border:2px solid #f39c12;min-width:520px;max-width:90%;padding:18px 20px;position:relative">
-        <div style="position:absolute;right:10px;top:6px;font-size:20px;cursor:pointer" id="rejectClose">✖</div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-          <div style="border:2px solid #f39c12;padding:4px 8px;font-weight:bold">驳回理由填写：</div>
-        </div>
-        <select id="rejectReasonSelect" style="width:220px;padding:6px 8px;border:1px solid #f39c12;margin-bottom:14px">
+      <div style="background:var(--surface);border-radius:var(--radius-lg);min-width:520px;max-width:90%;padding:32px;position:relative;box-shadow:0 20px 25px -5px rgb(0 0 0 / 0.15), 0 8px 10px -6px rgb(0 0 0 / 0.1), 0 0 0 1px var(--border)">
+        <div style="position:absolute;right:16px;top:16px;font-size:20px;cursor:pointer;color:var(--text-muted);width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:var(--transition)" id="rejectClose">✖</div>
+        <div style="font-weight:600;font-size:18px;margin-bottom:20px;text-align:center;color:var(--danger)">驳回理由填写</div>
+        <select id="rejectReasonSelect" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:16px;font-size:14px;outline:none">
           <option value="消息不真实">消息不真实</option>
           <option value="信息不完整">信息不完整</option>
           <option value="图片不清晰">图片不清晰</option>
           <option value="与物品不符">与物品不符</option>
           <option value="其他">其他</option>
         </select>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-          <div style="border:2px solid #f39c12;padding:4px 8px;font-weight:bold">填写具体理由：</div>
-        </div>
-        <textarea id="rejectReasonDetail" style="width:100%;min-height:90px;border:1px solid #f39c12;padding:8px;box-sizing:border-box"></textarea>
-        <div id="rejectError" style="color:#e74c3c;margin-top:8px;min-height:18px"></div>
-        <div style="text-align:right;margin-top:10px">
-          <button class="btn-sm" id="rejectCancelBtn" style="margin-right:8px">取消</button>
-          <button class="btn-sm btn-danger" id="rejectConfirmBtn">提交驳回</button>
+        <div style="font-weight:500;margin-bottom:8px;font-size:14px;color:var(--text-main)">填写具体理由：</div>
+        <textarea id="rejectReasonDetail" style="width:100%;min-height:100px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;box-sizing:border-box;font-size:14px;outline:none;resize:vertical"></textarea>
+        <div id="rejectError" style="color:var(--danger);margin-top:8px;min-height:18px;font-size:13px"></div>
+        <div style="display:flex;justify-content:flex-end;gap:16px;margin-top:24px;padding-top:24px;border-top:1px solid var(--border)">
+          <button class="btn-outline" id="rejectCancelBtn">取消</button>
+          <button class="btn-danger" id="rejectConfirmBtn">提交驳回</button>
         </div>
       </div>
     `;
@@ -198,7 +211,10 @@ Router.register('adminReview', function (app) {
       reviewList.addEventListener('click', (evt) => {
         if (evt.target.closest('[data-open-detail],[data-approve],[data-reject]')) return;
         const card = evt.target.closest('[data-review-item-id]');
-        if (card) Router.go('detail', { id: card.dataset.reviewItemId });
+        if (card) {
+          sessionStorage.setItem('lf_detail_back_route', 'adminReview');
+          Router.go('detail', { id: card.dataset.reviewItemId });
+        }
       });
       reviewList._detailDelegated = true;
     }
@@ -206,6 +222,7 @@ Router.register('adminReview', function (app) {
     document.querySelectorAll('[data-open-detail]').forEach(btn => {
       btn.onclick = (e) => {
         e.stopPropagation();
+        sessionStorage.setItem('lf_detail_back_route', 'adminReview');
         Router.go('detail', { id: btn.dataset.openDetail });
       };
     });
@@ -214,16 +231,16 @@ Router.register('adminReview', function (app) {
       b.onclick = async (e) => {
         e.stopPropagation();
         try { await api(`/api/admin/items/${b.dataset.approve}/approve`, { method: 'PUT' }); load(); }
-        catch (e) { alert(e.message); }
+        catch (e) { await uiAlert(e.message, '操作失败'); }
       };
     });
     document.querySelectorAll('[data-reject]').forEach(b => {
       b.onclick = async (e) => {
         e.stopPropagation();
-        const reason = prompt('请输入驳回原因（必填）:');
-        if (!reason) return;
+        const reason = await uiPrompt('请输入驳回原因（必填）', '驳回帖子', { required: true, placeholder: '请输入驳回原因' });
+        if (reason === null) return;
         try { await api(`/api/admin/items/${b.dataset.reject}/reject`, { method: 'PUT', body: JSON.stringify({ reason }) }); load(); }
-        catch (e) { alert(e.message); }
+        catch (e) { await uiAlert(e.message, '操作失败'); }
       };
     });
   }
@@ -243,53 +260,56 @@ Router.register('adminReview', function (app) {
 Router.register('adminManage', function (app) {
   const main = renderLayout(app, 'ADMIN', 'adminManage');
   main.innerHTML = `
-    <div class="filter-bar">
-      <label>消息类型</label><select id="mType"><option value="">所有</option><option value="LOST">寻物启事</option><option value="FOUND">失物招领</option></select>
-      <label>物品类型</label><select id="mCat"><option value="">所有</option><option value="证件">证件</option><option value="电子产品">电子产品</option><option value="生活用品">生活用品</option><option value="文体">文体</option><option value="书籍">书籍</option><option value="其他">其他</option></select>
-      <label>地点</label><select id="mLoc"><option value="">所有</option><option value="朝晖校区">朝晖校区</option><option value="屏峰校区">屏峰校区</option><option value="莫干山校区">莫干山校区</option></select>
-      <label>时间范围</label><select id="mTime"><option value="">所有</option><option value="7">近7天</option><option value="30">近30天</option><option value="90">近90天</option></select>
-      <label>物品状态</label><select id="mStatus"><option value="">所有</option><option value="CLAIM_ADMIN_REVIEW">管理员审核申请中</option><option value="CLAIM_OWNER_REVIEW">发布人审核申请中</option><option value="APPROVED">未匹配</option><option value="MATCHED">已匹配</option><option value="CLAIMED">已认领</option><option value="ARCHIVED">已归档</option><option value="CANCELLED">已取消</option></select>
-      <label>物品名查找</label><input type="text" id="mKeyword" />
-      <span class="search-icon" id="mSearchBtn">&#128269;</span>
+    <div class="filter-bar" style="display:flex;flex-wrap:wrap;gap:16px;background:var(--surface);padding:20px;border-radius:var(--radius-lg);box-shadow:0 4px 12px rgba(0,0,0,0.05);margin-bottom:24px;align-items:center;animation:fadeIn 0.3s ease">
+      <div style="display:flex;align-items:center;gap:8px"><label style="font-weight:600;color:var(--text-main)">消息类型</label><select id="mType" style="padding:8px 12px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg-color);outline:none;transition:all 0.2s ease" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border)';this.style.boxShadow='none'"><option value="">所有</option><option value="LOST">寻物启事</option><option value="FOUND">失物招领</option></select></div>
+      <div style="display:flex;align-items:center;gap:8px"><label style="font-weight:600;color:var(--text-main)">物品类型</label><select id="mCat" style="padding:8px 12px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg-color);outline:none;transition:all 0.2s ease" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border)';this.style.boxShadow='none'"><option value="">所有</option><option value="证件">证件</option><option value="电子产品">电子产品</option><option value="生活用品">生活用品</option><option value="文体">文体</option><option value="书籍">书籍</option><option value="其他">其他</option></select></div>
+      <div style="display:flex;align-items:center;gap:8px"><label style="font-weight:600;color:var(--text-main)">地点</label><select id="mLoc" style="padding:8px 12px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg-color);outline:none;transition:all 0.2s ease" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border)';this.style.boxShadow='none'"><option value="">所有</option><option value="朝晖校区">朝晖校区</option><option value="屏峰校区">屏峰校区</option><option value="莫干山校区">莫干山校区</option></select></div>
+      <div style="display:flex;align-items:center;gap:8px"><label style="font-weight:600;color:var(--text-main)">时间范围</label><select id="mTime" style="padding:8px 12px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg-color);outline:none;transition:all 0.2s ease" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border)';this.style.boxShadow='none'"><option value="">所有</option><option value="7">近7天</option><option value="30">近30天</option><option value="90">近90天</option></select></div>
+      <div style="display:flex;align-items:center;gap:8px"><label style="font-weight:600;color:var(--text-main)">物品状态</label><select id="mStatus" style="padding:8px 12px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg-color);outline:none;transition:all 0.2s ease" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border)';this.style.boxShadow='none'"><option value="">所有</option><option value="CLAIM_ADMIN_REVIEW">管理员审核申请中</option><option value="CLAIM_OWNER_REVIEW">发布人审核申请中</option><option value="APPROVED">未匹配</option><option value="MATCHED">已匹配</option><option value="CLAIMED">已认领</option><option value="ARCHIVED">已归档</option><option value="CANCELLED">已取消</option></select></div>
+      <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:200px"><label style="font-weight:600;color:var(--text-main);white-space:nowrap">物品名查找</label><input type="text" id="mKeyword" style="flex:1;padding:8px 12px;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg-color);outline:none;transition:all 0.2s ease" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border)';this.style.boxShadow='none'" /></div>
+      <span class="search-icon" id="mSearchBtn" style="cursor:pointer;font-size:20px;padding:8px;background:var(--primary);color:#fff;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;transition:all 0.2s ease;box-shadow:0 2px 8px rgba(var(--primary-rgb), 0.3)" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(var(--primary-rgb), 0.4)'" onmouseout="this.style.transform='none';this.style.boxShadow='0 2px 8px rgba(var(--primary-rgb), 0.3)'">&#128269;</span>
     </div>
-    <div id="manageList"></div>
-    <div id="managePager" class="pager"></div>
-    <div id="statusModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center">
-      <div style="background:#fff;padding:24px;border-radius:8px;min-width:280px;box-shadow:0 4px 20px rgba(0,0,0,0.15)">
-        <div style="margin-bottom:12px;font-weight:bold">更改状态为:</div>
-        <select id="statusModalSelect" style="width:100%;padding:8px 12px;margin-bottom:16px;border:1px solid #ddd;border-radius:4px;font-size:14px">
+    <div id="manageList" style="display:flex;flex-direction:column;gap:20px"></div>
+    <div id="managePager" class="pager" style="margin-top:32px"></div>
+    <div id="statusModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.08);z-index:1000;align-items:center;justify-content:center;padding:24px;box-sizing:border-box">
+      <div id="statusModalPanel" style="background:var(--surface);padding:32px;border-radius:16px;width:min(420px,100%);box-shadow:0 25px 50px -12px rgb(0 0 0 / 0.25), 0 0 0 1px var(--border);animation:scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards">
+        <div style="margin-bottom:16px;font-weight:600;font-size:18px;color:var(--text-main)">更改状态为:</div>
+        <select id="statusModalSelect" style="width:100%;padding:12px 16px;margin-bottom:24px;border:1px solid var(--border);border-radius:8px;font-size:15px;outline:none;background:var(--bg-color);transition:all 0.2s ease" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border)';this.style.boxShadow='none'">
           <option value="APPROVED">未认领</option>
           <option value="MATCHED">已匹配</option>
           <option value="CLAIMED">已认领</option>
           <option value="ARCHIVED">已归档</option>
         </select>
-        <button id="statusModalConfirm" class="btn-sm" style="width:100%;background:#333;color:#fff;border:1px solid #333;padding:8px">确认</button>
+        <div style="display:flex;gap:12px">
+          <button id="statusModalCancel" class="btn-outline" style="flex:1;padding:12px;background:transparent;color:var(--text-main);border:1px solid var(--border);border-radius:var(--radius-md);font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s ease" onmouseover="this.style.background='var(--bg-color)';this.style.borderColor='var(--text-muted)'" onmouseout="this.style.background='transparent';this.style.borderColor='var(--border)'">取消</button>
+          <button id="statusModalConfirm" class="btn-primary" style="flex:1;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:var(--radius-md);font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s ease;box-shadow:0 2px 8px rgba(var(--primary-rgb), 0.3)" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(var(--primary-rgb), 0.4)'" onmouseout="this.style.transform='none';this.style.boxShadow='0 2px 8px rgba(var(--primary-rgb), 0.3)'">确认</button>
+        </div>
       </div>
     </div>
-    <div id="archiveModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1001;align-items:center;justify-content:center">
-      <div style="background:#fff;padding:18px 20px;min-width:540px;max-width:92%;position:relative;border:1px solid #ddd">
-        <div id="archiveCloseBtn" style="position:absolute;right:12px;top:8px;font-size:34px;font-weight:bold;line-height:1;cursor:pointer">×</div>
-        <div style="font-size:36px;font-weight:bold;line-height:1;margin:6px 0 20px">物品处理方式填写：</div>
-        <select id="archiveMethodSelect" style="width:150px;padding:8px;border:1px solid #999;margin-bottom:20px">
+    <div id="archiveModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.08);z-index:1001;align-items:center;justify-content:center">
+      <div style="background:var(--surface);padding:32px 40px;min-width:540px;max-width:92%;position:relative;border-radius:16px;box-shadow:0 25px 50px -12px rgb(0 0 0 / 0.25), 0 0 0 1px var(--border);animation:scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards">
+        <div id="archiveCloseBtn" style="position:absolute;right:20px;top:16px;font-size:28px;color:var(--text-muted);cursor:pointer;transition:all 0.2s ease" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-muted)'">&times;</div>
+        <div style="font-size:24px;font-weight:700;color:var(--text-main);margin-bottom:24px">物品处理方式填写</div>
+        <select id="archiveMethodSelect" style="width:100%;padding:12px 16px;border:1px solid var(--border);border-radius:8px;margin-bottom:24px;font-size:15px;background:var(--bg-color);outline:none;transition:all 0.2s ease" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border)';this.style.boxShadow='none'">
           <option value="自行处理">自行处理</option>
           <option value="统一销毁">统一销毁</option>
           <option value="存储点存放">存储点存放</option>
         </select>
-        <div style="font-size:34px;font-weight:bold;line-height:1;margin:0 0 18px">填写具体地点以及照片：</div>
-        <input id="archiveLocationInput" style="width:360px;padding:8px;border:1px solid #999;margin-bottom:20px" />
-        <div id="archiveImgBox" style="display:flex;gap:18px;align-items:center"></div>
-        <div id="archiveError" style="color:#e74c3c;min-height:18px;margin-top:10px"></div>
-        <div style="text-align:right;margin-top:10px">
-          <button class="btn-sm btn-danger" id="archiveConfirmBtn">确认归档</button>
+        <div style="font-size:16px;font-weight:600;color:var(--text-main);margin-bottom:12px">填写具体地点以及照片：</div>
+        <input id="archiveLocationInput" style="width:100%;padding:12px 16px;border:1px solid var(--border);border-radius:8px;margin-bottom:24px;font-size:15px;background:var(--bg-color);outline:none;transition:all 0.2s ease" placeholder="请输入具体地点" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border)';this.style.boxShadow='none'" />
+        <div id="archiveImgBox" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"></div>
+        <div id="archiveError" style="color:var(--danger);min-height:20px;margin-top:12px;font-size:14px"></div>
+        <div style="text-align:right;margin-top:24px">
+          <button class="btn-danger" id="archiveConfirmBtn" style="padding:12px 32px;background:var(--danger);color:#fff;border:none;border-radius:var(--radius-md);font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s ease;box-shadow:0 2px 8px rgba(var(--danger-rgb), 0.3)" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(var(--danger-rgb), 0.4)'" onmouseout="this.style.transform='none';this.style.boxShadow='0 2px 8px rgba(var(--danger-rgb), 0.3)'">确认归档</button>
         </div>
       </div>
     </div>
-    <div id="archiveGuardModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1002;align-items:center;justify-content:center">
-      <div style="background:#fff;padding:24px;border-radius:8px;min-width:420px;max-width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.15)">
-        <div style="font-size:30px;color:#333;text-align:center;margin:6px 0 30px;font-weight:bold">消息存在尚未超过规定天数，是否归档?</div>
-        <div style="display:flex;justify-content:space-between;gap:20px">
-          <button class="btn-sm" id="archiveGuardYes" style="flex:1;min-height:42px;font-size:24px;font-weight:bold">是</button>
-          <button class="btn-sm" id="archiveGuardNo" style="flex:1;min-height:42px;font-size:24px;font-weight:bold">否</button>
+    <div id="archiveGuardModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.08);z-index:1002;align-items:center;justify-content:center">
+      <div style="background:var(--surface);padding:40px;border-radius:16px;min-width:420px;max-width:90%;box-shadow:0 25px 50px -12px rgb(0 0 0 / 0.25), 0 0 0 1px var(--border);animation:scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards">
+        <div style="font-size:20px;color:var(--text-main);text-align:center;margin-bottom:32px;font-weight:600;line-height:1.5">消息存在尚未超过规定天数<br>是否确认归档？</div>
+        <div style="display:flex;justify-content:center;gap:16px">
+          <button class="btn-outline" id="archiveGuardNo" style="flex:1;padding:12px;background:transparent;color:var(--text-main);border:1px solid var(--border);border-radius:var(--radius-md);font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s ease" onmouseover="this.style.background='var(--bg-color)';this.style.borderColor='var(--text-muted)'" onmouseout="this.style.background='transparent';this.style.borderColor='var(--border)'">取消</button>
+          <button class="btn-danger" id="archiveGuardYes" style="flex:1;padding:12px;background:var(--danger);color:#fff;border:none;border-radius:var(--radius-md);font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s ease;box-shadow:0 2px 8px rgba(var(--danger-rgb), 0.3)" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(var(--danger-rgb), 0.4)'" onmouseout="this.style.transform='none';this.style.boxShadow='0 2px 8px rgba(var(--danger-rgb), 0.3)'">确认归档</button>
         </div>
       </div>
     </div>
@@ -308,14 +328,14 @@ Router.register('adminManage', function (app) {
       const url = archiveUploadedUrls[i];
       if (url) {
         slots.push(`
-          <div style="position:relative;width:130px;height:130px;border:1px dashed #ddd;display:flex;align-items:center;justify-content:center">
+          <div style="position:relative;width:120px;height:120px;border-radius:var(--radius-md);overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.05)">
             <img src="${imgUrl(url)}" style="width:100%;height:100%;object-fit:cover" />
-            <span data-archive-rm="${esc(url)}" style="position:absolute;top:-8px;right:-8px;background:#e74c3c;color:#fff;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer">×</span>
+            <span data-archive-rm="${esc(url)}" style="position:absolute;top:4px;right:4px;background:rgba(231,76,60,0.9);color:#fff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;transition:transform 0.2s ease" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='none'">&times;</span>
           </div>
         `);
       } else {
         slots.push(`
-          <label style="width:130px;height:130px;border:1px dashed #ddd;display:flex;align-items:center;justify-content:center;font-size:52px;cursor:pointer;line-height:1">+
+          <label style="width:120px;height:120px;border:2px dashed var(--border);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;font-size:32px;color:var(--text-muted);cursor:pointer;transition:all 0.2s ease;background:var(--bg-color)" onmouseover="this.style.borderColor='var(--primary)';this.style.color='var(--primary)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">+
             <input type="file" accept="image/*" data-archive-upload="${i}" style="display:none" />
           </label>
         `);
@@ -392,7 +412,7 @@ Router.register('adminManage', function (app) {
       openArchiveModal(itemId);
       return;
     }
-    submitArchive(itemId, { method: '', location: '', imageUrls: '' }).catch(err => alert(err.message));
+    submitArchive(itemId, { method: '', location: '', imageUrls: '' }).catch(err => uiAlert(err.message, '操作失败'));
   }
 
   async function submitArchive(itemId, payload) {
@@ -419,39 +439,52 @@ Router.register('adminManage', function (app) {
       itemMap.clear();
       list.forEach(item => itemMap.set(String(item.id), item));
       document.getElementById('manageList').innerHTML = list.length === 0
-        ? '<p class="empty">暂无数据</p>'
+        ? '<p class="empty" style="text-align:center;padding:40px;color:var(--text-secondary);font-size:15px;">暂无数据</p>'
         : list.map(item => {
           const imgs = item.imageUrls ? item.imageUrls.split(',').filter(Boolean) : [];
           const isLost = item.type === 'LOST';
           const showArchiveDetail = item.status === 'ARCHIVED' && item.type === 'FOUND';
           const daysSince = daysSinceLastAction(item);
+          const statusColor = item.status === 'APPROVED' ? 'var(--success)' : item.status === 'REJECTED' ? 'var(--danger)' : item.status === 'ARCHIVED' ? 'var(--text-secondary)' : 'var(--warning)';
           return `
-            <div class="manage-card">
-              <div class="item-card-row" style="border:none;padding:0;margin:0;cursor:default">
-                <div class="card-left">
-                  <div class="item-type-label">${isLost ? '寻物启事' : '失物招领'}</div>
-                  <div class="item-status">目前进度：${statusLabel(item.status)}</div>
-                  <div class="item-info">
-                    <div>物品名称：${esc(item.title)}</div>
-                    <div>物品类型：${esc(item.category || '-')}</div>
-                    <div>${isLost ? '丢失' : '拾取'}地点：${esc(item.location || '-')}</div>
-                    <div>${isLost ? '丢失' : '拾得'}时间：${esc(item.lostTime || '-')}</div>
-                    ${showArchiveDetail ? `<div>处理方式：${esc(item.archiveMethod || '自行处理')}</div>` : ''}
-                    ${showArchiveDetail ? `<div>处理地点：${esc(item.archiveLocation || '-')}</div>` : ''}
+            <div class="manage-card" style="background:var(--surface);border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border-left:4px solid ${isLost ? 'var(--danger)' : 'var(--primary)'};transition:transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='none';this.style.boxShadow='0 2px 8px rgba(0,0,0,0.04)'">
+              <div class="item-card-row" style="display:flex;gap:20px;border:none;padding:0;margin:0;cursor:default">
+                <div class="card-left" style="flex:1;">
+                  <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                    <span style="padding:4px 10px;border-radius:6px;font-size:13px;font-weight:600;background:${isLost ? 'rgba(var(--danger-rgb),0.1)' : 'rgba(var(--primary-rgb),0.1)'};color:${isLost ? 'var(--danger)' : 'var(--primary)'}">${isLost ? '寻物启事' : '失物招领'}</span>
+                    <span style="font-size:13px;color:${statusColor};font-weight:500;display:flex;align-items:center;gap:4px;">
+                      <span style="width:6px;height:6px;border-radius:50%;background:currentColor;"></span>
+                      ${statusLabel(item.status)}
+                    </span>
+                  </div>
+                  <div class="item-info" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));gap:12px;font-size:14px;color:var(--text-regular);">
+                    <div style="display:flex;flex-direction:column;gap:4px;"><span style="color:var(--text-secondary);font-size:12px;">物品名称</span><span style="font-weight:500;color:var(--text-primary);">${esc(item.title)}</span></div>
+                    <div style="display:flex;flex-direction:column;gap:4px;"><span style="color:var(--text-secondary);font-size:12px;">物品类型</span><span>${esc(item.category || '-')}</span></div>
+                    <div style="display:flex;flex-direction:column;gap:4px;"><span style="color:var(--text-secondary);font-size:12px;">${isLost ? '丢失' : '拾取'}地点</span><span>${esc(item.location || '-')}</span></div>
+                    <div style="display:flex;flex-direction:column;gap:4px;"><span style="color:var(--text-secondary);font-size:12px;">${isLost ? '丢失' : '拾得'}时间</span><span>${esc(item.lostTime || '-')}</span></div>
+                    ${showArchiveDetail ? `<div style="display:flex;flex-direction:column;gap:4px;"><span style="color:var(--text-secondary);font-size:12px;">处理方式</span><span>${esc(item.archiveMethod || '自行处理')}</span></div>` : ''}
+                    ${showArchiveDetail ? `<div style="display:flex;flex-direction:column;gap:4px;"><span style="color:var(--text-secondary);font-size:12px;">处理地点</span><span>${esc(item.archiveLocation || '-')}</span></div>` : ''}
                   </div>
                 </div>
-                <div class="card-right">
-                  ${imgs.length > 0 ? imgs.slice(0, 2).map(u => imgTag(u, 100, 80)).join('') : '<div class="img-placeholder">暂无</div><div class="img-placeholder">暂无</div>'}
-                  <div class="card-time">发布时间：${fmtTime(item.createdAt)}</div>
+                <div class="card-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:12px;min-width:120px;">
+                  <div style="display:flex;gap:8px;">
+                    ${imgs.length > 0 ? imgs.slice(0, 2).map(u => `<img src="${u}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid var(--border-color);">`).join('') : '<div style="width:60px;height:60px;border-radius:8px;background:var(--background);display:flex;align-items:center;justify-content:center;color:var(--text-secondary);font-size:12px;border:1px dashed var(--border-color);">暂无图</div>'}
+                  </div>
+                  <div style="font-size:12px;color:var(--text-secondary);">发布于 ${fmtTime(item.createdAt)}</div>
                 </div>
               </div>
-              <div class="days-info">
-                <div>该物品距离最近操作已有 <b>${daysSince}</b> 天</div>
-                <div>目前进行到 <b>${statusLabel(item.status)}</b> 阶段</div>
-                ${daysSince >= claimExpireDays && item.status !== 'CANCELLED' ? '<div style="color:#e74c3c">该物品距离最近操作已有 ' + daysSince + ' 天，符合归档标准！</div>' : ''}
-              </div>
-              <div class="manage-actions">
-                ${item.status === 'CANCELLED' ? '<span style="color:#888;font-size:13px">已取消，无法管理</span>' : `<button class="btn-sm" data-mstatus="${item.id}">更改状态</button>`}
+              
+              <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+                <div class="days-info" style="display:flex;gap:16px;font-size:13px;color:var(--text-secondary);align-items:center;">
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    距上次操作 <b style="color:var(--text-primary);">${daysSince}</b> 天
+                  </div>
+                  ${daysSince >= claimExpireDays && item.status !== 'CANCELLED' ? `<div style="color:var(--danger);display:flex;align-items:center;gap:4px;background:rgba(var(--danger-rgb),0.1);padding:4px 8px;border-radius:4px;"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>符合归档标准</div>` : ''}
+                </div>
+                <div class="manage-actions">
+                  ${item.status === 'CANCELLED' ? '<span style="color:var(--text-secondary);font-size:13px;padding:6px 12px;background:var(--background);border-radius:6px;">已取消</span>' : `<button class="btn-sm" data-mstatus="${item.id}" style="padding:6px 16px;border-radius:6px;background:var(--primary);color:white;border:none;cursor:pointer;font-size:13px;font-weight:500;transition:all 0.2s;" onmouseover="this.style.filter='brightness(1.1)';this.style.transform='translateY(-1px)'" onmouseout="this.style.filter='none';this.style.transform='none'">更改状态</button>`}
+                </div>
               </div>
             </div>
           `;
@@ -497,12 +530,20 @@ Router.register('adminManage', function (app) {
       modal.style.display = 'none';
       load();
     } catch (e) {
-      alert(e.message);
+      await uiAlert(e.message, '操作失败');
     }
   };
   document.getElementById('statusModal').addEventListener('click', function (e) {
     if (e.target === this) this.style.display = 'none';
   });
+  document.getElementById('statusModalPanel').addEventListener('click', function (e) {
+    e.stopPropagation();
+  });
+  document.getElementById('statusModalCancel').onclick = () => {
+    const modal = document.getElementById('statusModal');
+    modal._itemId = null;
+    modal.style.display = 'none';
+  };
 
   document.getElementById('archiveCloseBtn').onclick = () => {
     document.getElementById('archiveModal').style.display = 'none';
@@ -564,7 +605,7 @@ Router.register('adminManage', function (app) {
       openArchiveModal(itemId);
       return;
     }
-    submitArchive(itemId, { method: '', location: '', imageUrls: '' }).catch(err => alert(err.message));
+    submitArchive(itemId, { method: '', location: '', imageUrls: '' }).catch(err => uiAlert(err.message, '操作失败'));
   };
   document.getElementById('archiveGuardNo').onclick = () => {
     closeArchiveGuardModal();
@@ -579,11 +620,16 @@ Router.register('adminManage', function (app) {
 Router.register('adminMaintain', async function (app) {
   const main = renderLayout(app, 'ADMIN', 'adminMaintain');
   main.innerHTML = `
-    <div class="tab-bar">
-      <button class="tab-btn" data-mtab="update">更新信息</button>
-      <button class="tab-btn" data-mtab="overview">消息总览</button>
-      <button class="tab-btn" data-mtab="filter">筛选统计</button>
+    <div class="tab-bar" style="display:flex;gap:32px;border-bottom:1px solid var(--border-color);margin-bottom:24px;padding:0 8px;">
+      <button class="tab-btn" data-mtab="update" style="background:none;border:none;padding:12px 4px;font-size:15px;font-weight:500;color:var(--text-secondary);cursor:pointer;position:relative;transition:color 0.2s;">更新信息</button>
+      <button class="tab-btn" data-mtab="overview" style="background:none;border:none;padding:12px 4px;font-size:15px;font-weight:500;color:var(--text-secondary);cursor:pointer;position:relative;transition:color 0.2s;">消息总览</button>
+      <button class="tab-btn" data-mtab="filter" style="background:none;border:none;padding:12px 4px;font-size:15px;font-weight:500;color:var(--text-secondary);cursor:pointer;position:relative;transition:color 0.2s;">筛选统计</button>
     </div>
+    <style>
+      .tab-btn.active { color: var(--primary) !important; }
+      .tab-btn::after { content:''; position:absolute; bottom:-1px; left:0; width:100%; height:3px; background:var(--primary); border-radius:3px 3px 0 0; transform:scaleX(0); transition:transform 0.2s; }
+      .tab-btn.active::after { transform:scaleX(1); }
+    </style>
     <div id="maintainContent"></div>
   `;
 
@@ -604,14 +650,35 @@ Router.register('adminMaintain', async function (app) {
     const box = document.getElementById('maintainContent');
     if (currentTab === 'update') {
       box.innerHTML = `
-        <div class="filter-bar">
-          <label>消息类型</label><select id="muType"><option value="">所有</option><option value="LOST">寻物启事</option><option value="FOUND">失物招领</option></select>
-          <label>物品类型</label><select id="muCat"><option value="">所有</option><option value="证件">证件</option><option value="电子产品">电子产品</option><option value="生活用品">生活用品</option><option value="文体">文体</option><option value="书籍">书籍</option><option value="其他">其他</option></select>
-          <label>地点</label><select id="muLoc"><option value="">所有</option><option value="朝晖校区">朝晖校区</option><option value="屏峰校区">屏峰校区</option><option value="莫干山校区">莫干山校区</option></select>
-          <label>时间范围</label><select id="muTime"><option value="">所有</option><option value="7">近7天</option><option value="30">近30天</option><option value="90">近90天</option></select>
-          <label>物品状态</label><select id="muStatus"><option value="">所有</option><option value="PENDING">待审核</option><option value="CLAIM_ADMIN_REVIEW">管理员审核申请中</option><option value="CLAIM_OWNER_REVIEW">发布人审核申请中</option><option value="APPROVED">未匹配</option><option value="REJECTED">已驳回</option><option value="MATCHED">已匹配</option><option value="CLAIMED">已认领</option><option value="ARCHIVED">已归档</option><option value="CANCELLED">已取消</option></select>
-          <label>物品名查找</label><input type="text" id="muKeyword" />
-          <span class="search-icon" id="muSearchBtn">&#128269;</span>
+        <div class="filter-bar" style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;background:var(--surface);padding:20px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.04);margin-bottom:24px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label style="font-size:13px;color:var(--text-secondary);font-weight:500;">消息类型</label>
+            <select id="muType" style="padding:8px 32px 8px 12px;border:1px solid var(--border-color);border-radius:6px;font-size:14px;background:var(--background);cursor:pointer;appearance:none;background-image:url('data:image/svg+xml;utf8,<svg fill=%22%23666%22 viewBox=%220 0 24 24%22 width=%2216%22 height=%2216%22><path d=%22M7 10l5 5 5-5z%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;outline:none;transition:all 0.2s;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'"><option value="">所有</option><option value="LOST">寻物启事</option><option value="FOUND">失物招领</option></select>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label style="font-size:13px;color:var(--text-secondary);font-weight:500;">物品类型</label>
+            <select id="muCat" style="padding:8px 32px 8px 12px;border:1px solid var(--border-color);border-radius:6px;font-size:14px;background:var(--background);cursor:pointer;appearance:none;background-image:url('data:image/svg+xml;utf8,<svg fill=%22%23666%22 viewBox=%220 0 24 24%22 width=%2216%22 height=%2216%22><path d=%22M7 10l5 5 5-5z%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;outline:none;transition:all 0.2s;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'"><option value="">所有</option><option value="证件">证件</option><option value="电子产品">电子产品</option><option value="生活用品">生活用品</option><option value="文体">文体</option><option value="书籍">书籍</option><option value="其他">其他</option></select>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label style="font-size:13px;color:var(--text-secondary);font-weight:500;">地点</label>
+            <select id="muLoc" style="padding:8px 32px 8px 12px;border:1px solid var(--border-color);border-radius:6px;font-size:14px;background:var(--background);cursor:pointer;appearance:none;background-image:url('data:image/svg+xml;utf8,<svg fill=%22%23666%22 viewBox=%220 0 24 24%22 width=%2216%22 height=%2216%22><path d=%22M7 10l5 5 5-5z%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;outline:none;transition:all 0.2s;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'"><option value="">所有</option><option value="朝晖校区">朝晖校区</option><option value="屏峰校区">屏峰校区</option><option value="莫干山校区">莫干山校区</option></select>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label style="font-size:13px;color:var(--text-secondary);font-weight:500;">时间范围</label>
+            <select id="muTime" style="padding:8px 32px 8px 12px;border:1px solid var(--border-color);border-radius:6px;font-size:14px;background:var(--background);cursor:pointer;appearance:none;background-image:url('data:image/svg+xml;utf8,<svg fill=%22%23666%22 viewBox=%220 0 24 24%22 width=%2216%22 height=%2216%22><path d=%22M7 10l5 5 5-5z%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;outline:none;transition:all 0.2s;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'"><option value="">所有</option><option value="7">近7天</option><option value="30">近30天</option><option value="90">近90天</option></select>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label style="font-size:13px;color:var(--text-secondary);font-weight:500;">物品状态</label>
+            <select id="muStatus" style="padding:8px 32px 8px 12px;border:1px solid var(--border-color);border-radius:6px;font-size:14px;background:var(--background);cursor:pointer;appearance:none;background-image:url('data:image/svg+xml;utf8,<svg fill=%22%23666%22 viewBox=%220 0 24 24%22 width=%2216%22 height=%2216%22><path d=%22M7 10l5 5 5-5z%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;outline:none;transition:all 0.2s;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'"><option value="">所有</option><option value="PENDING">待审核</option><option value="CLAIM_ADMIN_REVIEW">管理员审核申请中</option><option value="CLAIM_OWNER_REVIEW">发布人审核申请中</option><option value="APPROVED">未匹配</option><option value="REJECTED">已驳回</option><option value="MATCHED">已匹配</option><option value="CLAIMED">已认领</option><option value="ARCHIVED">已归档</option><option value="CANCELLED">已取消</option></select>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:200px;">
+            <div style="position:relative;flex:1;display:flex;align-items:center;">
+              <input type="text" id="muKeyword" placeholder="物品名查找..." style="width:100%;padding:8px 36px 8px 12px;border:1px solid var(--border-color);border-radius:6px;font-size:14px;background:var(--background);outline:none;transition:all 0.2s;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'" />
+              <span class="search-icon" id="muSearchBtn" style="position:absolute;right:10px;cursor:pointer;color:var(--text-secondary);transition:color 0.2s;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-secondary)'">
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              </span>
+            </div>
+          </div>
         </div>
         <div id="maintainList"></div>
         <div id="maintainPager" class="pager"></div>
@@ -630,7 +697,7 @@ Router.register('adminMaintain', async function (app) {
           const page = data.data;
           const list = page.content || [];
           document.getElementById('maintainList').innerHTML = list.length === 0
-            ? '<p class="empty">暂无数据</p>'
+            ? '<p class="empty" style="text-align:center;padding:40px;color:var(--text-secondary);font-size:15px;">暂无数据</p>'
             : list.map(item => itemCardHtml(item)).join('');
           document.querySelectorAll('#maintainList .item-card-row[data-id]').forEach(c => {
             c.onclick = () => Router.go('adminEditItem', { id: c.dataset.id });
@@ -694,41 +761,56 @@ Router.register('adminMaintain', async function (app) {
         const bars = monthly.map(m => {
           const h = maxMonthly === 0 ? 0 : Math.round((m.total || 0) / maxMonthly * 160);
           return `
-            <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
-              <div style="width:28px;height:${h}px;background:#000"></div>
-              <div style="font-size:12px">${m.label || ''}</div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:8px;flex:1;min-width:30px;">
+              <div style="width:100%;max-width:32px;height:${h}px;background:var(--primary);border-radius:4px 4px 0 0;transition:height 0.3s, filter 0.2s;" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'" title="${m.total || 0}条"></div>
+              <div style="font-size:12px;color:var(--text-secondary);">${m.label || ''}</div>
             </div>
           `;
         }).join('');
         const monthLines = monthly.map(m => {
-          return `<div>${m.label || ''}：${m.lost || 0} 条失物 + ${m.found || 0} 条寻物</div>`;
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:var(--background);border-radius:8px;font-size:14px;"><span style="font-weight:500;color:var(--text-primary);">${m.label || ''}</span><span style="color:var(--text-secondary);"><span style="color:var(--primary);font-weight:500;">${m.lost || 0}</span> 寻物 / <span style="color:var(--danger);font-weight:500;">${m.found || 0}</span> 招领</span></div>`;
         }).join('');
 
         box.innerHTML = `
-          <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
-            <div style="background:#d9d9d9;padding:18px 22px;min-width:360px">
-              <div style="font-weight:bold;margin-bottom:10px">数据统计：</div>
-              <div>总发布消息数量：${s.totalItems || 0}</div>
-              <div>总失物招领数量：${s.foundCount || 0}</div>
-              <div>总寻物启事数量：${s.lostCount || 0}</div>
-              <div>已匹配消息数量：${s.matchedItems || 0}</div>
-              <div>已认领消息数量：${s.claimedItems || 0}</div>
-              <div>已归档消息数量：${s.archivedItems || 0}</div>
-              <div>认领率：${rate}%</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));gap:24px;margin-bottom:32px;">
+            <div style="background:var(--surface);border-radius:12px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border:1px solid var(--border-color);">
+              <div style="font-size:16px;font-weight:600;color:var(--text-primary);margin-bottom:20px;display:flex;align-items:center;gap:8px;">
+                <svg viewBox="0 0 24 24" width="20" height="20" stroke="var(--primary)" stroke-width="2" fill="none"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>
+                数据统计
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:14px;color:var(--text-regular);">
+                <div style="display:flex;flex-direction:column;gap:4px;"><span style="color:var(--text-secondary);font-size:12px;">总发布消息</span><span style="font-size:20px;font-weight:600;color:var(--text-primary);">${s.totalItems || 0}</span></div>
+                <div style="display:flex;flex-direction:column;gap:4px;"><span style="color:var(--text-secondary);font-size:12px;">认领率</span><span style="font-size:20px;font-weight:600;color:var(--primary);">${rate}%</span></div>
+                <div style="display:flex;flex-direction:column;gap:4px;"><span style="color:var(--text-secondary);font-size:12px;">失物招领</span><span style="font-size:16px;font-weight:500;">${s.foundCount || 0}</span></div>
+                <div style="display:flex;flex-direction:column;gap:4px;"><span style="color:var(--text-secondary);font-size:12px;">寻物启事</span><span style="font-size:16px;font-weight:500;">${s.lostCount || 0}</span></div>
+                <div style="display:flex;flex-direction:column;gap:4px;"><span style="color:var(--text-secondary);font-size:12px;">已匹配</span><span style="font-size:16px;font-weight:500;">${s.matchedItems || 0}</span></div>
+                <div style="display:flex;flex-direction:column;gap:4px;"><span style="color:var(--text-secondary);font-size:12px;">已认领</span><span style="font-size:16px;font-weight:500;color:var(--success);">${s.claimedItems || 0}</span></div>
+                <div style="display:flex;flex-direction:column;gap:4px;"><span style="color:var(--text-secondary);font-size:12px;">已归档</span><span style="font-size:16px;font-weight:500;color:var(--warning);">${s.archivedItems || 0}</span></div>
+              </div>
             </div>
-            <div style="display:flex;flex-direction:column;align-items:center;gap:10px;min-width:260px">
+            <div style="background:var(--surface);border-radius:12px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border:1px solid var(--border-color);display:flex;flex-direction:column;align-items:center;justify-content:center;">
+              <div style="font-size:16px;font-weight:600;color:var(--text-primary);margin-bottom:20px;align-self:flex-start;display:flex;align-items:center;gap:8px;">
+                <svg viewBox="0 0 24 24" width="20" height="20" stroke="var(--primary)" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a10 10 0 0 1 10 10"></path></svg>
+                状态分布
+              </div>
               ${pieSvg()}
-              <div style="font-weight:bold">失物招领消息状态饼图</div>
+              <div style="display:flex;gap:16px;margin-top:20px;flex-wrap:wrap;justify-content:center;">
+                ${pieData.map(d => `<div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);"><span style="width:10px;height:10px;border-radius:50%;background:${d.color};"></span>${d.label}</div>`).join('')}
+              </div>
             </div>
           </div>
-          <div style="margin-top:26px;font-weight:bold">近一年截至目前的统计数据</div>
-          <div style="display:flex;gap:24px;align-items:flex-start;margin-top:12px;flex-wrap:wrap">
-            <div style="background:#fff;border:1px solid #ddd;padding:20px 20px 16px;min-width:360px">
-              <div style="display:flex;align-items:flex-end;gap:14px;height:200px">${bars}</div>
-              <div style="text-align:center;margin-top:10px;font-weight:bold">每月发布消息条形图</div>
+          
+          <div style="font-size:16px;font-weight:600;color:var(--text-primary);margin-bottom:16px;display:flex;align-items:center;gap:8px;">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="var(--primary)" stroke-width="2" fill="none"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+            近一年趋势
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));gap:24px;">
+            <div style="background:var(--surface);border-radius:12px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border:1px solid var(--border-color);overflow-x:auto;">
+              <div style="display:flex;align-items:flex-end;gap:16px;height:200px;padding-bottom:10px;border-bottom:1px solid var(--border-color);">${bars}</div>
+              <div style="text-align:center;margin-top:16px;font-size:13px;color:var(--text-secondary);">每月发布消息数量</div>
             </div>
-            <div style="background:#d9d9d9;padding:16px 20px;min-width:300px">
-              <div style="border:1px solid #f39c12;padding:10px 12px;line-height:1.8">${monthLines}</div>
+            <div style="background:var(--surface);border-radius:12px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border:1px solid var(--border-color);">
+              <div style="display:flex;flex-direction:column;gap:12px;">${monthLines}</div>
             </div>
           </div>
         `;
@@ -739,15 +821,41 @@ Router.register('adminMaintain', async function (app) {
     }
     if (currentTab === 'filter') {
       box.innerHTML = `
-        <button class="btn-outline" id="mfExportBtn" style="margin-bottom:12px">导出统计数据</button>
-        <div class="filter-bar">
-          <label>消息类型</label><select id="mfType"><option value="">所有</option><option value="LOST">寻物启事</option><option value="FOUND">失物招领</option></select>
-          <label>物品类型</label><select id="mfCat"><option value="">所有</option><option value="证件">证件</option><option value="电子产品">电子产品</option><option value="生活用品">生活用品</option><option value="文体">文体</option><option value="书籍">书籍</option><option value="其他">其他</option></select>
-          <label>地点</label><select id="mfLoc"><option value="">所有</option><option value="朝晖校区">朝晖校区</option><option value="屏峰校区">屏峰校区</option><option value="莫干山校区">莫干山校区</option></select>
-          <label>物品状态</label><select id="mfStatus"><option value="">所有</option><option value="PENDING">待审核</option><option value="CLAIM_ADMIN_REVIEW">管理员审核申请中</option><option value="CLAIM_OWNER_REVIEW">发布人审核申请中</option><option value="APPROVED">未匹配</option><option value="REJECTED">已驳回</option><option value="MATCHED">已匹配</option><option value="CLAIMED">已认领</option><option value="ARCHIVED">已归档</option><option value="CANCELLED">已取消</option></select>
-          <label>时间范围</label><select id="mfTime"><option value="">所有</option><option value="7">近7天</option><option value="30">近30天</option><option value="90">近90天</option></select>
-          <label>物品名查找</label><input type="text" id="mfKeyword" />
-          <span class="search-icon" id="mfSearchBtn">&#128269;</span>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
+          <button class="btn-outline" id="mfExportBtn" style="display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:6px;font-size:14px;font-weight:500;transition:all 0.2s;">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            导出统计数据
+          </button>
+        </div>
+        <div class="filter-bar" style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;background:var(--surface);padding:20px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.04);margin-bottom:24px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label style="font-size:13px;color:var(--text-secondary);font-weight:500;">消息类型</label>
+            <select id="mfType" style="padding:8px 32px 8px 12px;border:1px solid var(--border-color);border-radius:6px;font-size:14px;background:var(--background);cursor:pointer;appearance:none;background-image:url('data:image/svg+xml;utf8,<svg fill=%22%23666%22 viewBox=%220 0 24 24%22 width=%2216%22 height=%2216%22><path d=%22M7 10l5 5 5-5z%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;outline:none;transition:all 0.2s;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'"><option value="">所有</option><option value="LOST">寻物启事</option><option value="FOUND">失物招领</option></select>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label style="font-size:13px;color:var(--text-secondary);font-weight:500;">物品类型</label>
+            <select id="mfCat" style="padding:8px 32px 8px 12px;border:1px solid var(--border-color);border-radius:6px;font-size:14px;background:var(--background);cursor:pointer;appearance:none;background-image:url('data:image/svg+xml;utf8,<svg fill=%22%23666%22 viewBox=%220 0 24 24%22 width=%2216%22 height=%2216%22><path d=%22M7 10l5 5 5-5z%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;outline:none;transition:all 0.2s;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'"><option value="">所有</option><option value="证件">证件</option><option value="电子产品">电子产品</option><option value="生活用品">生活用品</option><option value="文体">文体</option><option value="书籍">书籍</option><option value="其他">其他</option></select>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label style="font-size:13px;color:var(--text-secondary);font-weight:500;">地点</label>
+            <select id="mfLoc" style="padding:8px 32px 8px 12px;border:1px solid var(--border-color);border-radius:6px;font-size:14px;background:var(--background);cursor:pointer;appearance:none;background-image:url('data:image/svg+xml;utf8,<svg fill=%22%23666%22 viewBox=%220 0 24 24%22 width=%2216%22 height=%2216%22><path d=%22M7 10l5 5 5-5z%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;outline:none;transition:all 0.2s;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'"><option value="">所有</option><option value="朝晖校区">朝晖校区</option><option value="屏峰校区">屏峰校区</option><option value="莫干山校区">莫干山校区</option></select>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label style="font-size:13px;color:var(--text-secondary);font-weight:500;">物品状态</label>
+            <select id="mfStatus" style="padding:8px 32px 8px 12px;border:1px solid var(--border-color);border-radius:6px;font-size:14px;background:var(--background);cursor:pointer;appearance:none;background-image:url('data:image/svg+xml;utf8,<svg fill=%22%23666%22 viewBox=%220 0 24 24%22 width=%2216%22 height=%2216%22><path d=%22M7 10l5 5 5-5z%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;outline:none;transition:all 0.2s;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'"><option value="">所有</option><option value="PENDING">待审核</option><option value="CLAIM_ADMIN_REVIEW">管理员审核申请中</option><option value="CLAIM_OWNER_REVIEW">发布人审核申请中</option><option value="APPROVED">未匹配</option><option value="REJECTED">已驳回</option><option value="MATCHED">已匹配</option><option value="CLAIMED">已认领</option><option value="ARCHIVED">已归档</option><option value="CANCELLED">已取消</option></select>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <label style="font-size:13px;color:var(--text-secondary);font-weight:500;">时间范围</label>
+            <select id="mfTime" style="padding:8px 32px 8px 12px;border:1px solid var(--border-color);border-radius:6px;font-size:14px;background:var(--background);cursor:pointer;appearance:none;background-image:url('data:image/svg+xml;utf8,<svg fill=%22%23666%22 viewBox=%220 0 24 24%22 width=%2216%22 height=%2216%22><path d=%22M7 10l5 5 5-5z%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;outline:none;transition:all 0.2s;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'"><option value="">所有</option><option value="7">近7天</option><option value="30">近30天</option><option value="90">近90天</option></select>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:200px;">
+            <div style="position:relative;flex:1;display:flex;align-items:center;">
+              <input type="text" id="mfKeyword" placeholder="物品名查找..." style="width:100%;padding:8px 36px 8px 12px;border:1px solid var(--border-color);border-radius:6px;font-size:14px;background:var(--background);outline:none;transition:all 0.2s;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'" />
+              <span class="search-icon" id="mfSearchBtn" style="position:absolute;right:10px;cursor:pointer;color:var(--text-secondary);transition:color 0.2s;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-secondary)'">
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              </span>
+            </div>
+          </div>
         </div>
         <div id="mfList"></div>
         <div id="mfPager" class="pager"></div>
@@ -791,7 +899,7 @@ Router.register('adminMaintain', async function (app) {
           const page = data.data;
           const list = page.content || [];
           document.getElementById('mfList').innerHTML = list.length === 0
-            ? '<p class="empty">暂无数据</p>'
+            ? '<p class="empty" style="text-align:center;padding:40px;color:var(--text-secondary);font-size:15px;">暂无数据</p>'
             : list.map(item => itemCardHtml(item)).join('');
           document.querySelectorAll('#mfList .item-card-row[data-id]').forEach(c => {
             c.onclick = () => Router.go('detail', { id: c.dataset.id });
@@ -822,7 +930,7 @@ Router.register('adminMaintain', async function (app) {
           }
 
           if (all.length === 0) {
-            alert('当前筛选条件下无可导出数据');
+            await uiAlert('当前筛选条件下无可导出数据', '导出提示');
             return;
           }
 
@@ -853,7 +961,7 @@ Router.register('adminMaintain', async function (app) {
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
         } catch (e) {
-          alert(e.message || '导出失败');
+          await uiAlert(e.message || '导出失败', '导出失败');
         } finally {
           btn.disabled = false;
           btn.textContent = oldText;
@@ -892,23 +1000,43 @@ Router.register('adminEditItem', async function (app, params) {
     const specificLoc = locParts.length > 1 ? locParts.slice(1).join(' — ') : (item.location || '');
 
     main.innerHTML = `
-      <div class="publish-form">
-        <span class="back-arrow" id="backMaintain">&#x21A9;</span>
-        <h3>修改发布信息 ${canEdit ? '' : '<span style="color:#888;font-size:13px">（已归档/已认领，无法修改）</span>'}</h3>
-        <div class="form-group"><label>物品名称 <span class="req">*</span>:</label><input id="eTitle" value="${esc(item.title || '')}" ${dis} /></div>
-        <div class="form-group"><label>${esc(locLabel)} <span class="req">*</span>:</label><input id="eLocation" value="${esc(specificLoc)}" ${dis} /></div>
-        <div class="form-group"><label>${esc(timeLabel)} <span class="req">*</span>:</label><input id="eLostTime" value="${esc(item.lostTime || '')}" ${dis} /></div>
-        ${isLost ? `<div class="form-group"><label>悬赏（可选）：</label><input id="eReward" type="number" value="${item.reward || ''}" ${dis} /></div>` : `<div class="form-group"><label>领取地点：</label><input id="eStorage" value="${esc(item.storageLocation || '')}" ${dis} /></div>`}
-        <div class="form-group"><label>物品介绍 <span class="req">*</span>:</label><textarea id="eDesc" ${dis}>${esc(item.description || '')}</textarea></div>
-        <div class="form-group"><label>${esc(campusLabel)} <span class="req">*</span>:</label>
-          <select id="eCampus" ${dis}>
+      <div class="publish-form" style="max-width:800px;margin:0 auto;background:var(--surface);padding:32px;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,0.06);position:relative;">
+        <span class="back-arrow" id="backMaintain" style="position:absolute;top:32px;left:32px;font-size:24px;color:var(--text-secondary);cursor:pointer;transition:color 0.2s;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-secondary)'">&#x21A9;</span>
+        <h3 style="text-align:center;margin-bottom:32px;font-size:24px;color:var(--text-primary);font-weight:600;">修改发布信息 ${canEdit ? '' : '<span style="color:var(--danger);font-size:14px;font-weight:normal;background:rgba(var(--danger-rgb),0.1);padding:4px 8px;border-radius:4px;vertical-align:middle;">已归档/已认领，无法修改</span>'}</h3>
+        
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+          <div class="form-group" style="display:flex;flex-direction:column;gap:8px;">
+            <label style="font-size:14px;font-weight:500;color:var(--text-primary);">物品名称 <span class="req" style="color:var(--danger);">*</span></label>
+            <input id="eTitle" value="${esc(item.title || '')}" ${dis} style="padding:12px 16px;border:1px solid var(--border-color);border-radius:8px;font-size:15px;background:var(--background);transition:all 0.2s;outline:none;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'" />
+          </div>
+          <div class="form-group" style="display:flex;flex-direction:column;gap:8px;">
+            <label style="font-size:14px;font-weight:500;color:var(--text-primary);">${esc(locLabel)} <span class="req" style="color:var(--danger);">*</span></label>
+            <input id="eLocation" value="${esc(specificLoc)}" ${dis} style="padding:12px 16px;border:1px solid var(--border-color);border-radius:8px;font-size:15px;background:var(--background);transition:all 0.2s;outline:none;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'" />
+          </div>
+          <div class="form-group" style="display:flex;flex-direction:column;gap:8px;">
+            <label style="font-size:14px;font-weight:500;color:var(--text-primary);">${esc(timeLabel)} <span class="req" style="color:var(--danger);">*</span></label>
+            <input id="eLostTime" value="${esc(item.lostTime || '')}" ${dis} style="padding:12px 16px;border:1px solid var(--border-color);border-radius:8px;font-size:15px;background:var(--background);transition:all 0.2s;outline:none;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'" />
+          </div>
+          ${isLost ? `<div class="form-group" style="display:flex;flex-direction:column;gap:8px;"><label style="font-size:14px;font-weight:500;color:var(--text-primary);">悬赏（可选）</label><input id="eReward" type="number" value="${item.reward || ''}" ${dis} style="padding:12px 16px;border:1px solid var(--border-color);border-radius:8px;font-size:15px;background:var(--background);transition:all 0.2s;outline:none;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'" /></div>` : `<div class="form-group" style="display:flex;flex-direction:column;gap:8px;"><label style="font-size:14px;font-weight:500;color:var(--text-primary);">领取地点</label><input id="eStorage" value="${esc(item.storageLocation || '')}" ${dis} style="padding:12px 16px;border:1px solid var(--border-color);border-radius:8px;font-size:15px;background:var(--background);transition:all 0.2s;outline:none;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'" /></div>`}
+        </div>
+        
+        <div class="form-group" style="display:flex;flex-direction:column;gap:8px;margin-top:24px;">
+          <label style="font-size:14px;font-weight:500;color:var(--text-primary);">物品介绍 <span class="req" style="color:var(--danger);">*</span></label>
+          <textarea id="eDesc" ${dis} style="padding:12px 16px;border:1px solid var(--border-color);border-radius:8px;font-size:15px;background:var(--background);transition:all 0.2s;outline:none;min-height:120px;resize:vertical;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'">${esc(item.description || '')}</textarea>
+        </div>
+        
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px;">
+          <div class="form-group" style="display:flex;flex-direction:column;gap:8px;">
+            <label style="font-size:14px;font-weight:500;color:var(--text-primary);">${esc(campusLabel)} <span class="req" style="color:var(--danger);">*</span></label>
+            <select id="eCampus" ${dis} style="padding:12px 16px;border:1px solid var(--border-color);border-radius:8px;font-size:15px;background:var(--background);cursor:pointer;appearance:none;background-image:url('data:image/svg+xml;utf8,<svg fill=%22%23666%22 viewBox=%220 0 24 24%22 width=%2216%22 height=%2216%22><path d=%22M7 10l5 5 5-5z%22/></svg>');background-repeat:no-repeat;background-position:right 12px center;outline:none;transition:all 0.2s;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'">
             <option value="朝晖校区" ${campusVal.includes('朝晖') ? 'selected' : ''}>朝晖校区</option>
             <option value="屏峰校区" ${campusVal.includes('屏峰') ? 'selected' : ''}>屏峰校区</option>
             <option value="莫干山校区" ${campusVal.includes('莫干山') ? 'selected' : ''}>莫干山校区</option>
           </select>
-        </div>
-        <div class="form-group"><label>物品类型 <span class="req">*</span>:</label>
-          <select id="eCategory" ${dis}>
+          </div>
+          <div class="form-group" style="display:flex;flex-direction:column;gap:8px;">
+            <label style="font-size:14px;font-weight:500;color:var(--text-primary);">物品类型 <span class="req" style="color:var(--danger);">*</span></label>
+            <select id="eCategory" ${dis} style="padding:12px 16px;border:1px solid var(--border-color);border-radius:8px;font-size:15px;background:var(--background);cursor:pointer;appearance:none;background-image:url('data:image/svg+xml;utf8,<svg fill=%22%23666%22 viewBox=%220 0 24 24%22 width=%2216%22 height=%2216%22><path d=%22M7 10l5 5 5-5z%22/></svg>');background-repeat:no-repeat;background-position:right 12px center;outline:none;transition:all 0.2s;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'">
             <option value="文体" ${item.category === '文体' ? 'selected' : ''}>文体</option>
             <option value="证件" ${item.category === '证件' ? 'selected' : ''}>证件</option>
             <option value="电子产品" ${item.category === '电子产品' ? 'selected' : ''}>电子产品</option>
@@ -916,21 +1044,33 @@ Router.register('adminEditItem', async function (app, params) {
             <option value="书籍" ${item.category === '书籍' ? 'selected' : ''}>书籍</option>
             <option value="其他" ${item.category === '其他' ? 'selected' : ''}>其他</option>
           </select>
-        </div>
-        <div class="form-group">
-          <label>图片${canEdit ? '' : '（不可修改）'}：</label>
-          <div style="display:flex;gap:10px;flex-wrap:wrap" id="eImgBox">
-            ${existingImgs.map(u => `<div style="position:relative;width:80px;height:80px" class="eimg-wrap"><img src="${imgUrl(u)}" style="width:80px;height:80px;object-fit:cover;border:1px solid #ccc" />${canEdit ? `<span style="position:absolute;top:-6px;right:-6px;background:#e74c3c;color:#fff;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer" data-ermurl="${esc(u)}">&times;</span>` : ''}</div>`).join('')}
-            ${canEdit && existingImgs.length < 3 ? `<label class="upload-area" id="eUploadLabel">+<input type="file" id="eImgInput" accept="image/*" multiple style="display:none" /></label>` : ''}
           </div>
         </div>
-        <div class="form-group"><label>联系人名称/班级 <span class="req">*</span>:</label><input id="eContact" value="${esc(item.contactName || '')}" ${dis} /></div>
-        <div class="form-group"><label>联系方式 <span class="req">*</span>:</label><input id="ePhone" value="${esc(item.contactPhone || '')}" ${dis} /></div>
-        <div class="form-actions">
-          <button class="btn-outline" id="eCancelBtn">取消</button>
-          <button class="btn-primary" id="eSaveBtn" ${canEdit ? '' : 'disabled'}>保存修改</button>
+        
+        <div class="form-group" style="display:flex;flex-direction:column;gap:8px;margin-top:24px;">
+          <label style="font-size:14px;font-weight:500;color:var(--text-primary);">图片${canEdit ? '' : ' <span style="color:var(--text-secondary);font-weight:normal;">（不可修改）</span>'}</label>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;" id="eImgBox">
+            ${existingImgs.map(u => `<div style="position:relative;width:100px;height:100px;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);" class="eimg-wrap"><img src="${imgUrl(u)}" style="width:100%;height:100%;object-fit:cover;" />${canEdit ? `<span style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;transition:background 0.2s;" onmouseover="this.style.background='var(--danger)'" onmouseout="this.style.background='rgba(0,0,0,0.6)'" data-ermurl="${esc(u)}">&times;</span>` : ''}</div>`).join('')}
+            ${canEdit && existingImgs.length < 3 ? `<label class="upload-area" id="eUploadLabel" style="width:100px;height:100px;border:2px dashed var(--border-color);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;color:var(--text-secondary);transition:all 0.2s;background:var(--background);" onmouseover="this.style.borderColor='var(--primary)';this.style.color='var(--primary)'" onmouseout="this.style.borderColor='var(--border-color)';this.style.color='var(--text-secondary)'"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span style="font-size:12px;margin-top:4px;">上传图片</span><input type="file" id="eImgInput" accept="image/*" multiple style="display:none" /></label>` : ''}
+          </div>
         </div>
-        <p id="eMsg" class="msg"></p>
+        
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px;">
+          <div class="form-group" style="display:flex;flex-direction:column;gap:8px;">
+            <label style="font-size:14px;font-weight:500;color:var(--text-primary);">联系人名称/班级 <span class="req" style="color:var(--danger);">*</span></label>
+            <input id="eContact" value="${esc(item.contactName || '')}" ${dis} style="padding:12px 16px;border:1px solid var(--border-color);border-radius:8px;font-size:15px;background:var(--background);transition:all 0.2s;outline:none;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'" />
+          </div>
+          <div class="form-group" style="display:flex;flex-direction:column;gap:8px;">
+            <label style="font-size:14px;font-weight:500;color:var(--text-primary);">联系方式 <span class="req" style="color:var(--danger);">*</span></label>
+            <input id="ePhone" value="${esc(item.contactPhone || '')}" ${dis} style="padding:12px 16px;border:1px solid var(--border-color);border-radius:8px;font-size:15px;background:var(--background);transition:all 0.2s;outline:none;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'" />
+          </div>
+        </div>
+        
+        <div class="form-actions" style="display:flex;justify-content:flex-end;gap:16px;margin-top:40px;padding-top:24px;border-top:1px solid var(--border-color);">
+          <button class="btn-outline" id="eCancelBtn" style="padding:10px 24px;border-radius:8px;font-size:15px;font-weight:500;">取消</button>
+          <button class="btn-primary" id="eSaveBtn" ${canEdit ? '' : 'disabled'} style="padding:10px 32px;border-radius:8px;font-size:15px;font-weight:500;background:var(--primary);color:white;border:none;cursor:${canEdit ? 'pointer' : 'not-allowed'};opacity:${canEdit ? '1' : '0.5'};transition:all 0.2s;" ${canEdit ? `onmouseover="this.style.filter='brightness(1.1)';this.style.transform='translateY(-1px)'" onmouseout="this.style.filter='none';this.style.transform='none'"` : ''}>保存修改</button>
+        </div>
+        <p id="eMsg" class="msg" style="text-align:center;margin-top:16px;"></p>
       </div>
     `;
 
@@ -959,12 +1099,12 @@ Router.register('adminEditItem', async function (app, params) {
               editImgUrls.push(url);
               const wrap = document.createElement('div');
               wrap.className = 'eimg-wrap';
-              wrap.style.cssText = 'position:relative;width:80px;height:80px;';
-              wrap.innerHTML = '<img src="' + imgUrl(url) + '" style="width:80px;height:80px;object-fit:cover;border:1px solid #ccc" /><span style="position:absolute;top:-6px;right:-6px;background:#e74c3c;color:#fff;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer" data-ermurl="' + url + '">&times;</span>';
+              wrap.style.cssText = 'position:relative;width:100px;height:100px;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);';
+              wrap.innerHTML = '<img src="' + imgUrl(url) + '" style="width:100%;height:100%;object-fit:cover;" /><span style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;transition:background 0.2s;" onmouseover="this.style.background=\'var(--danger)\'" onmouseout="this.style.background=\'rgba(0,0,0,0.6)\'" data-ermurl="' + url + '">&times;</span>';
               eImgBox.insertBefore(wrap, eUploadLabel);
             });
             if (editImgUrls.length >= 3 && eUploadLabel) eUploadLabel.style.display = 'none';
-          } catch (e) { alert(e.message); }
+          } catch (e) { await uiAlert(e.message, '操作失败'); }
           eImgInput.value = '';
         };
       }
@@ -1014,13 +1154,29 @@ Router.register('adminEditItem', async function (app, params) {
 Router.register('adminHistory', function (app) {
   const main = renderLayout(app, 'ADMIN', 'adminHistory');
   main.innerHTML = `
-    <h2 style="text-align:center;margin-bottom:20px">历史审核记录</h2>
-    <div class="filter-bar">
-      <label>消息类型</label><select id="ahType"><option value="">所有</option><option value="LOST">寻物启事</option><option value="FOUND">失物招领</option><option value="CLAIM">申请</option></select>
-      <label>地点</label><select id="ahLoc"><option value="">所有</option><option value="朝晖校区">朝晖校区</option><option value="屏峰校区">屏峰校区</option><option value="莫干山校区">莫干山校区</option></select>
-      <label>时间范围</label><select id="ahTime"><option value="">所有</option><option value="7">近7天</option><option value="30">近30天</option><option value="90">近90天</option></select>
-      <label>物品名查找</label><input type="text" id="ahKeyword" />
-      <span class="search-icon" id="ahSearchBtn">&#128269;</span>
+    <h2 style="text-align:center;margin-bottom:24px;font-size:24px;color:var(--text-primary);font-weight:600;">历史审核记录</h2>
+    <div class="filter-bar" style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;background:var(--surface);padding:20px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.04);margin-bottom:24px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <label style="font-size:13px;color:var(--text-secondary);font-weight:500;">消息类型</label>
+        <select id="ahType" style="padding:8px 32px 8px 12px;border:1px solid var(--border-color);border-radius:6px;font-size:14px;background:var(--background);cursor:pointer;appearance:none;background-image:url('data:image/svg+xml;utf8,<svg fill=%22%23666%22 viewBox=%220 0 24 24%22 width=%2216%22 height=%2216%22><path d=%22M7 10l5 5 5-5z%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;outline:none;transition:all 0.2s;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'"><option value="">所有</option><option value="LOST">寻物启事</option><option value="FOUND">失物招领</option><option value="CLAIM">申请</option></select>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <label style="font-size:13px;color:var(--text-secondary);font-weight:500;">地点</label>
+        <select id="ahLoc" style="padding:8px 32px 8px 12px;border:1px solid var(--border-color);border-radius:6px;font-size:14px;background:var(--background);cursor:pointer;appearance:none;background-image:url('data:image/svg+xml;utf8,<svg fill=%22%23666%22 viewBox=%220 0 24 24%22 width=%2216%22 height=%2216%22><path d=%22M7 10l5 5 5-5z%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;outline:none;transition:all 0.2s;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'"><option value="">所有</option><option value="朝晖校区">朝晖校区</option><option value="屏峰校区">屏峰校区</option><option value="莫干山校区">莫干山校区</option></select>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <label style="font-size:13px;color:var(--text-secondary);font-weight:500;">时间范围</label>
+        <select id="ahTime" style="padding:8px 32px 8px 12px;border:1px solid var(--border-color);border-radius:6px;font-size:14px;background:var(--background);cursor:pointer;appearance:none;background-image:url('data:image/svg+xml;utf8,<svg fill=%22%23666%22 viewBox=%220 0 24 24%22 width=%2216%22 height=%2216%22><path d=%22M7 10l5 5 5-5z%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;outline:none;transition:all 0.2s;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'"><option value="">所有</option><option value="7">近7天</option><option value="30">近30天</option><option value="90">近90天</option></select>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:200px;">
+        <div style="position:relative;flex:1;display:flex;align-items:center;">
+          <input type="text" id="ahKeyword" placeholder="物品名查找..." style="width:100%;padding:8px 36px 8px 12px;border:1px solid var(--border-color);border-radius:6px;font-size:14px;background:var(--background);outline:none;transition:all 0.2s;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'" />
+          <span class="search-icon" id="ahSearchBtn" style="position:absolute;right:10px;cursor:pointer;color:var(--text-secondary);transition:color 0.2s;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-secondary)'">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          </span>
+        </div>
+      </div>
+    </div>
     </div>
     <div id="ahList"></div>
     <div id="ahPager" class="pager"></div>
@@ -1036,38 +1192,48 @@ Router.register('adminHistory', function (app) {
     const timeLabel = isLost ? '丢失时间' : '拾得时间';
     const imgs = item.imageUrls ? item.imageUrls.split(',').filter(Boolean) : [];
     const resultLabel = r.result === 'REJECTED' ? '驳回' : '通过';
+    const resultColor = r.result === 'REJECTED' ? 'var(--danger)' : 'var(--success)';
     const reason = r.result === 'REJECTED'
       ? (r.type === 'CLAIM' ? claim.rejectReason : item.rejectReason)
       : '';
     const claimInfo = r.type === 'CLAIM'
       ? `
-        <div>申请人：${esc(claim.claimer?.username || '-')}</div>
-        <div>申请留言：${esc(claim.message || claim.proof || '-')}</div>
+        <div style="display:flex;flex-direction:column;gap:4px;"><span style="color:var(--text-secondary);font-size:12px;">申请人</span><span>${esc(claim.claimer?.username || '-')}</span></div>
+        <div style="display:flex;flex-direction:column;gap:4px;"><span style="color:var(--text-secondary);font-size:12px;">申请留言</span><span>${esc(claim.message || claim.proof || '-')}</span></div>
       `
       : '';
     return `
-      <div style="border:1px solid #ddd;margin-bottom:12px">
-        <div class="item-card-row" style="border:none;margin:0;cursor:pointer" data-id="${item.id || ''}">
-          <div class="card-left">
-            <div class="item-type-label">${esc(typeLabel)}</div>
-            <div class="item-info">
-              <div>物品名称：${esc(item.title || '-')}</div>
-              <div>物品类型：${esc(item.category || '-')}</div>
-              <div>${locLabel}：${esc(item.location || '-')}</div>
-              <div>${timeLabel}：${esc(item.lostTime || '-')}</div>
+      <div style="background:var(--surface);border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border-left:4px solid ${resultColor};transition:transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='none';this.style.boxShadow='0 2px 8px rgba(0,0,0,0.04)'">
+        <div class="item-card-row" style="display:flex;gap:20px;border:none;padding:0;margin:0;cursor:pointer" data-id="${item.id || ''}">
+          <div class="card-left" style="flex:1;">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+              <span style="padding:4px 10px;border-radius:6px;font-size:13px;font-weight:600;background:rgba(var(--primary-rgb),0.1);color:var(--primary)">${esc(typeLabel)}</span>
+              <span style="font-size:13px;color:${resultColor};font-weight:500;display:flex;align-items:center;gap:4px;">
+                <span style="width:6px;height:6px;border-radius:50%;background:currentColor;"></span>
+                审核${resultLabel}
+              </span>
+            </div>
+            <div class="item-info" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));gap:12px;font-size:14px;color:var(--text-regular);">
+              <div style="display:flex;flex-direction:column;gap:4px;"><span style="color:var(--text-secondary);font-size:12px;">物品名称</span><span style="font-weight:500;color:var(--text-primary);">${esc(item.title || '-')}</span></div>
+              <div style="display:flex;flex-direction:column;gap:4px;"><span style="color:var(--text-secondary);font-size:12px;">物品类型</span><span>${esc(item.category || '-')}</span></div>
+              <div style="display:flex;flex-direction:column;gap:4px;"><span style="color:var(--text-secondary);font-size:12px;">${locLabel}</span><span>${esc(item.location || '-')}</span></div>
+              <div style="display:flex;flex-direction:column;gap:4px;"><span style="color:var(--text-secondary);font-size:12px;">${timeLabel}</span><span>${esc(item.lostTime || '-')}</span></div>
               ${claimInfo}
             </div>
           </div>
-          <div class="card-right-wrap">
-            <div class="card-images">
-              ${imgs.length > 0 ? imgs.slice(0, 2).map(u => imgTag(u, 100, 80)).join('') : '<div class="img-placeholder">暂无图片</div><div class="img-placeholder">暂无图片</div>'}
+          <div class="card-right-wrap" style="display:flex;flex-direction:column;align-items:flex-end;gap:12px;min-width:120px;">
+            <div class="card-images" style="display:flex;gap:8px;">
+              ${imgs.length > 0 ? imgs.slice(0, 2).map(u => `<img src="${u}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid var(--border-color);">`).join('') : '<div style="width:60px;height:60px;border-radius:8px;background:var(--background);display:flex;align-items:center;justify-content:center;color:var(--text-secondary);font-size:12px;border:1px dashed var(--border-color);">暂无图</div>'}
             </div>
-            <div class="card-time">审核时间：${fmtTime(r.reviewTime)}</div>
+            <div class="card-time" style="font-size:12px;color:var(--text-secondary);">审核于 ${fmtTime(r.reviewTime)}</div>
           </div>
         </div>
-        <div style="padding:10px 16px;border-top:1px solid #eee">
-          <div><b>审核结果：</b>${resultLabel}</div>
-          ${r.result === 'REJECTED' ? `<div><b>原因：</b>${esc(reason || '-')}</div>` : ''}
+        <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border-color);display:flex;flex-direction:column;gap:8px;font-size:14px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="color:var(--text-secondary);">审核结果：</span>
+            <span style="font-weight:500;color:${resultColor};">${resultLabel}</span>
+          </div>
+          ${r.result === 'REJECTED' ? `<div style="display:flex;align-items:flex-start;gap:8px;"><span style="color:var(--text-secondary);white-space:nowrap;">驳回原因：</span><span style="color:var(--text-primary);">${esc(reason || '-')}</span></div>` : ''}
         </div>
       </div>
     `;
@@ -1084,7 +1250,7 @@ Router.register('adminHistory', function (app) {
       const page = data.data;
       const list = page.content || [];
       document.getElementById('ahList').innerHTML = list.length === 0
-        ? '<p class="empty">暂无历史审核记录</p>'
+        ? '<p class="empty" style="text-align:center;padding:40px;color:var(--text-secondary);font-size:15px;">暂无历史审核记录</p>'
         : list.map(r => reviewCardHtml(r)).join('');
       document.querySelectorAll('.item-card-row[data-id]').forEach(c => {
         c.onclick = () => c.dataset.id && Router.go('detail', { id: c.dataset.id });
@@ -1105,36 +1271,48 @@ Router.register('adminRegionAnno', function (app) {
   const main = renderLayout(app, 'ADMIN', 'adminRegionAnno');
   const region = Auth.getRegion() || '';
   main.innerHTML = `
-    <div style="max-width:700px">
-      <div style="font-size:18px;font-weight:bold;margin-bottom:18px">发送地区：</div>
-      <div class="form-group">
-        <select id="regionAnnoRegion" style="width:240px">
+    <div style="max-width:800px;margin:0 auto;background:var(--surface);padding:32px;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
+      <div style="font-size:20px;font-weight:600;color:var(--text-primary);margin-bottom:24px;display:flex;align-items:center;gap:8px;">
+        <svg viewBox="0 0 24 24" width="24" height="24" stroke="var(--primary)" stroke-width="2" fill="none"><path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0"></path></svg>
+        发布地区公告
+      </div>
+      
+      <div class="form-group" style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px;">
+        <label style="font-size:14px;font-weight:500;color:var(--text-primary);">发送地区</label>
+        <select id="regionAnnoRegion" style="width:100%;max-width:300px;padding:12px 16px;border:1px solid var(--border-color);border-radius:8px;font-size:15px;background:var(--background);cursor:pointer;appearance:none;background-image:url('data:image/svg+xml;utf8,<svg fill=%22%23666%22 viewBox=%220 0 24 24%22 width=%2216%22 height=%2216%22><path d=%22M7 10l5 5 5-5z%22/></svg>');background-repeat:no-repeat;background-position:right 12px center;outline:none;transition:all 0.2s;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'">
           <option value="朝晖校区">朝晖校区</option>
           <option value="屏峰校区">屏峰校区</option>
           <option value="莫干山校区">莫干山校区</option>
         </select>
       </div>
-      <div class="form-group">
-        <label>标题:</label>
-        <input id="regionAnnoTitle" style="width:420px" />
+      
+      <div class="form-group" style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px;">
+        <label style="font-size:14px;font-weight:500;color:var(--text-primary);">公告标题</label>
+        <input id="regionAnnoTitle" placeholder="请输入公告标题" style="width:100%;padding:12px 16px;border:1px solid var(--border-color);border-radius:8px;font-size:15px;background:var(--background);transition:all 0.2s;outline:none;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'" />
       </div>
-      <div class="form-group">
-        <label>内容:</label>
-        <textarea id="regionAnnoContent" style="width:520px;min-height:220px"></textarea>
+      
+      <div class="form-group" style="display:flex;flex-direction:column;gap:8px;margin-bottom:32px;">
+        <label style="font-size:14px;font-weight:500;color:var(--text-primary);">公告内容</label>
+        <textarea id="regionAnnoContent" placeholder="请输入公告详细内容..." style="width:100%;min-height:200px;padding:12px 16px;border:1px solid var(--border-color);border-radius:8px;font-size:15px;background:var(--background);transition:all 0.2s;outline:none;resize:vertical;" onfocus="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 3px rgba(var(--primary-rgb), 0.1)'" onblur="this.style.borderColor='var(--border-color)';this.style.boxShadow='none'"></textarea>
       </div>
-      <div style="display:flex;justify-content:space-between;max-width:520px;margin-top:30px">
-        <button class="btn-outline" id="regionAnnoClear">删除</button>
-        <button class="btn-outline" id="regionAnnoSend">发送</button>
+      
+      <div style="display:flex;justify-content:flex-end;gap:16px;padding-top:24px;border-top:1px solid var(--border-color);">
+        <button class="btn-outline" id="regionAnnoClear" style="padding:10px 24px;border-radius:8px;font-size:15px;font-weight:500;color:var(--danger);border-color:var(--danger);background:transparent;transition:all 0.2s;" onmouseover="this.style.background='rgba(var(--danger-rgb),0.1)'" onmouseout="this.style.background='transparent'">清空</button>
+        <button class="btn-primary" id="regionAnnoSend" style="padding:10px 32px;border-radius:8px;font-size:15px;font-weight:500;background:var(--primary);color:white;border:none;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.filter='brightness(1.1)';this.style.transform='translateY(-1px)'" onmouseout="this.style.filter='none';this.style.transform='none'">发送公告</button>
       </div>
-      <p id="regionAnnoMsg" class="msg" style="margin-top:12px"></p>
+      <p id="regionAnnoMsg" class="msg" style="margin-top:16px;text-align:center;"></p>
     </div>
-    <div id="regionAnnoConfirm" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center">
-      <div style="background:#fff;padding:24px;border-radius:8px;min-width:320px;box-shadow:0 4px 20px rgba(0,0,0,0.15)">
-        <div style="font-weight:bold;margin-bottom:8px">确认发送地区公告</div>
-        <div style="font-size:13px;color:#666;margin-bottom:12px">发送后将对所属校区生效</div>
-        <div style="text-align:right;margin-top:12px">
-          <button class="btn-sm" id="regionAnnoCancel" style="margin-right:8px">取消</button>
-          <button class="btn-sm btn-danger" id="regionAnnoConfirmSend">确认发送</button>
+    
+    <div id="regionAnnoConfirm" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.08);z-index:1000;align-items:center;justify-content:center">
+      <div style="background:var(--surface);padding:32px;border-radius:16px;min-width:360px;box-shadow:0 10px 40px rgba(0,0,0,0.2);border:1px solid var(--border-color);animation:modalFadeIn 0.2s ease-out;">
+        <div style="font-size:18px;font-weight:600;color:var(--text-primary);margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="var(--warning)" stroke-width="2" fill="none"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+          确认发送地区公告
+        </div>
+        <div style="font-size:14px;color:var(--text-secondary);margin-bottom:24px;line-height:1.5;">发送后将对所选校区的所有用户生效，是否确认发送？</div>
+        <div style="display:flex;justify-content:flex-end;gap:12px;">
+          <button class="btn-outline" id="regionAnnoCancel" style="padding:8px 20px;border-radius:6px;font-size:14px;font-weight:500;">取消</button>
+          <button class="btn-primary" id="regionAnnoConfirmSend" style="padding:8px 20px;border-radius:6px;font-size:14px;font-weight:500;background:var(--primary);color:white;border:none;cursor:pointer;">确认发送</button>
         </div>
       </div>
     </div>
@@ -1174,10 +1352,15 @@ Router.register('adminRegionAnno', function (app) {
 Router.register('adminViewAnno', async function (app) {
   const main = renderLayout(app, 'ADMIN', 'adminViewAnno');
   main.innerHTML = `
-    <div class="tab-bar">
-      <button class="tab-btn active" data-atab="global">全体公告</button>
-      <button class="tab-btn" data-atab="region">地区公告</button>
+    <div class="tab-bar" style="display:flex;gap:32px;border-bottom:1px solid var(--border-color);margin-bottom:24px;padding:0 8px;">
+      <button class="tab-btn active" data-atab="global" style="background:none;border:none;padding:12px 4px;font-size:15px;font-weight:500;color:var(--text-secondary);cursor:pointer;position:relative;transition:color 0.2s;">全体公告</button>
+      <button class="tab-btn" data-atab="region" style="background:none;border:none;padding:12px 4px;font-size:15px;font-weight:500;color:var(--text-secondary);cursor:pointer;position:relative;transition:color 0.2s;">地区公告</button>
     </div>
+    <style>
+      .tab-btn.active { color: var(--primary) !important; }
+      .tab-btn::after { content:''; position:absolute; bottom:-1px; left:0; width:100%; height:3px; background:var(--primary); border-radius:3px 3px 0 0; transform:scaleX(0); transition:transform 0.2s; }
+      .tab-btn.active::after { transform:scaleX(1); }
+    </style>
     <div id="adminAnnoList"></div>
   `;
   let currentTab = 'global';
@@ -1198,17 +1381,23 @@ Router.register('adminViewAnno', async function (app) {
       const data = await api(`/api/announcements?${qs.toString()}`);
       const list = data.data || [];
       document.getElementById('adminAnnoList').innerHTML = list.length === 0
-        ? '<p class="empty">暂无公告</p>'
+        ? '<p class="empty" style="text-align:center;padding:40px;color:var(--text-secondary);font-size:15px;">暂无公告</p>'
         : list.map(a => `
-          <div class="anno-card">
-            <h3>${esc(a.title)}</h3>
-            ${a.scope === 'REGION' ? `<div style="font-size:12px;color:#888;text-align:center">地区公告：${esc(a.region || '-')}</div>` : ''}
-            <p>${esc(a.content)}</p>
-            <div class="anno-time">发布于：${fmtTime(a.createdAt)}</div>
+          <div class="anno-card" style="background:var(--surface);border-radius:12px;padding:24px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border:1px solid var(--border-color);transition:transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='none';this.style.boxShadow='0 2px 8px rgba(0,0,0,0.04)'">
+            <h3 style="margin:0 0 12px 0;font-size:18px;color:var(--text-primary);font-weight:600;display:flex;align-items:center;gap:8px;">
+              <svg viewBox="0 0 24 24" width="20" height="20" stroke="var(--primary)" stroke-width="2" fill="none"><path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0"></path></svg>
+              ${esc(a.title)}
+            </h3>
+            ${a.scope === 'REGION' ? `<div style="font-size:12px;color:var(--primary);background:rgba(var(--primary-rgb),0.1);padding:4px 8px;border-radius:4px;display:inline-block;margin-bottom:16px;">地区公告：${esc(a.region || '-')}</div>` : ''}
+            <p style="margin:0 0 16px 0;font-size:15px;color:var(--text-regular);line-height:1.6;white-space:pre-wrap;">${esc(a.content)}</p>
+            <div class="anno-time" style="font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:4px;">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              发布于 ${fmtTime(a.createdAt)}
+            </div>
           </div>
         `).join('');
     } catch (e) {
-      document.getElementById('adminAnnoList').innerHTML = '<p class="empty">暂无公告</p>';
+      document.getElementById('adminAnnoList').innerHTML = '<p class="empty" style="text-align:center;padding:40px;color:var(--text-secondary);font-size:15px;">暂无公告</p>';
     }
   }
   load();
@@ -1221,15 +1410,21 @@ Router.register('adminNotify', async function (app) {
     const data = await api('/api/notifications?page=0&size=8');
     const list = (data.data && data.data.content) ? data.data.content : (data.data || []);
     document.getElementById('adminNotifyList').innerHTML = list.length === 0
-      ? '<p class="empty">暂无系统通知</p>'
+      ? '<p class="empty" style="text-align:center;padding:40px;color:var(--text-secondary);font-size:15px;">暂无系统通知</p>'
       : list.map(n => `
-        <div class="notify-card">
-          <div class="notify-content">${esc(n.content || '')}</div>
-          <div class="notify-time">发布于：${fmtTime(n.createdAt)}</div>
+        <div class="notify-card" style="background:var(--surface);border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.04);border:1px solid var(--border-color);border-left:4px solid var(--primary);transition:transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='none';this.style.boxShadow='0 2px 8px rgba(0,0,0,0.04)'">
+          <div class="notify-content" style="font-size:15px;color:var(--text-primary);line-height:1.6;margin-bottom:12px;display:flex;align-items:flex-start;gap:12px;">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="var(--primary)" stroke-width="2" fill="none" style="flex-shrink:0;margin-top:2px;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            <div style="flex:1;">${esc(n.content || '')}</div>
+          </div>
+          <div class="notify-time" style="font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:4px;margin-left:32px;">
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            发布于 ${fmtTime(n.createdAt)}
+          </div>
         </div>
       `).join('');
   } catch (e) {
-    document.getElementById('adminNotifyList').innerHTML = `<p class="empty">${e.message}</p>`;
+    document.getElementById('adminNotifyList').innerHTML = `<p class="empty" style="text-align:center;padding:40px;color:var(--danger);font-size:15px;">${e.message}</p>`;
   }
 });
 

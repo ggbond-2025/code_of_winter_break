@@ -102,3 +102,107 @@ function fmtTime(str) {
       + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
   } catch (_) { return str; }
 }
+
+function uiDialog(options = {}) {
+  const {
+    title = '提示',
+    message = '',
+    mode = 'alert',
+    confirmText = '确认',
+    cancelText = '取消',
+    placeholder = '',
+    defaultValue = '',
+    required = false
+  } = options;
+
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.background = 'rgba(15,23,42,0.08)';
+    overlay.style.zIndex = '2200';
+
+    const inputHtml = mode === 'prompt'
+      ? `<textarea id="uiDialogInput" style="width:100%;min-height:96px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:var(--bg-color);color:var(--text-main);font-size:14px;resize:vertical;box-sizing:border-box;outline:none">${esc(defaultValue)}</textarea>`
+      : '';
+
+    const cancelBtnHtml = mode === 'alert'
+      ? ''
+      : `<button class="btn-outline" id="uiDialogCancel" style="padding:10px 24px;border-radius:10px">${esc(cancelText)}</button>`;
+
+    overlay.innerHTML = `
+      <div class="modal-box" style="min-width:min(520px,92vw);max-width:92vw;padding:28px 28px 22px;">
+        <h3 style="margin-bottom:14px">${esc(title)}</h3>
+        <div style="font-size:15px;line-height:1.7;color:var(--text-main);margin-bottom:${mode === 'prompt' ? '12px' : '20px'};white-space:pre-wrap">${esc(message)}</div>
+        ${inputHtml}
+        <div id="uiDialogError" style="min-height:18px;color:var(--danger);font-size:13px;margin-top:8px"></div>
+        <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:18px">
+          ${cancelBtnHtml}
+          <button class="btn-primary" id="uiDialogConfirm" style="padding:10px 24px;border-radius:10px">${esc(confirmText)}</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const cleanup = () => {
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    };
+
+    const rejectWith = (value) => {
+      cleanup();
+      resolve(value);
+    };
+
+    const confirmBtn = overlay.querySelector('#uiDialogConfirm');
+    const cancelBtn = overlay.querySelector('#uiDialogCancel');
+    const errEl = overlay.querySelector('#uiDialogError');
+    const inputEl = overlay.querySelector('#uiDialogInput');
+
+    if (inputEl) {
+      inputEl.placeholder = placeholder || '';
+      setTimeout(() => inputEl.focus(), 0);
+    }
+
+    if (cancelBtn) {
+      cancelBtn.onclick = () => rejectWith(mode === 'prompt' ? null : false);
+    }
+
+    confirmBtn.onclick = () => {
+      if (mode === 'alert') return rejectWith(true);
+      if (mode === 'confirm') return rejectWith(true);
+      const val = (inputEl?.value || '').trim();
+      if (required && !val) {
+        if (errEl) errEl.textContent = '请输入内容';
+        return;
+      }
+      rejectWith(val);
+    };
+
+    overlay.onclick = (e) => {
+      if (e.target !== overlay) return;
+      if (mode === 'alert') rejectWith(true);
+      else rejectWith(mode === 'prompt' ? null : false);
+    };
+  });
+}
+
+function uiAlert(message, title = '提示') {
+  return uiDialog({ mode: 'alert', title, message, confirmText: '确认' });
+}
+
+function uiConfirm(message, title = '确认操作') {
+  return uiDialog({ mode: 'confirm', title, message, confirmText: '确认', cancelText: '取消' });
+}
+
+function uiPrompt(message, title = '请输入', options = {}) {
+  return uiDialog({
+    mode: 'prompt',
+    title,
+    message,
+    confirmText: options.confirmText || '确认',
+    cancelText: options.cancelText || '取消',
+    placeholder: options.placeholder || '',
+    defaultValue: options.defaultValue || '',
+    required: !!options.required
+  });
+}

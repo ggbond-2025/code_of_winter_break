@@ -11,6 +11,7 @@ public interface ClaimRecordRepository extends JpaRepository<ClaimRecord, Long> 
     List<ClaimRecord> findByClaimerIdOrderByCreatedAtDesc(Long claimerId);
     List<ClaimRecord> findByItemIdOrderByCreatedAtDesc(Long itemId);
     ClaimRecord findTopByItemIdAndClaimerIdOrderByCreatedAtDesc(Long itemId, Long claimerId);
+    boolean existsByItemIdAndClaimerIdAndStatus(Long itemId, Long claimerId, String status);
     List<ClaimRecord> findByStatusOrderByCreatedAtDesc(String status);
     List<ClaimRecord> findByReviewerIdOrderByCreatedAtDesc(Long reviewerId);
         @Query("""

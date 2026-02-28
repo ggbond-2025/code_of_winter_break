@@ -133,11 +133,12 @@ Base URL: `http://localhost:8080`
 ### 6.1 用户列表
 - **GET** `/api/super/users?keyword=&role=&page=0&size=20`
 
-### 6.2 新增管理员
+### 6.2 新增账号（管理员/普通用户）
 - **POST** `/api/super/users`
 ```json
-{ "username": "admin01", "password": "123456", "realName": "管理员A" }
+{ "username": "user01", "password": "123456", "realName": "张三", "role": "USER" }
 ```
+- `role` 可选：`USER`（普通用户）、`ADMIN`（管理员），不传默认按管理员创建。
 
 ### 6.3 启用/禁用用户
 - **PUT** `/api/super/users/{id}/toggle`
@@ -188,8 +189,8 @@ Base URL: `http://localhost:8080`
 }
 ```
 
-### 6.12 导出数据（按范围和类型下载 SQL）
-- **POST** `/api/super/export/sql`
+### 6.12 导出数据（按范围和类型下载 CSV）
+- **POST** `/api/super/export/csv`
 - Request Body：
 ```json
 {
@@ -206,8 +207,8 @@ Base URL: `http://localhost:8080`
 - Response `data` 示例：
 ```json
 {
-  "downloadUrl": "/uploads/exports/data-export-20260221-201500-a1b2c3d4.sql",
-  "fileName": "data-export-20260221-201500-a1b2c3d4.sql",
+  "downloadUrl": "/uploads/exports/data-export-20260221-201500-a1b2c3d4.csv",
+  "fileName": "data-export-20260221-201500-a1b2c3d4.csv",
   "rangeMonths": 4,
   "types": ["失物招领", "全局公告"],
   "rows": 123

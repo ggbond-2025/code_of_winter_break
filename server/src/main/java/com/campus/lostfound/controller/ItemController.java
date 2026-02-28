@@ -32,6 +32,7 @@ public class ItemController {
 
     @GetMapping
     public ApiResponse<Page<LostItem>> list(
+            HttpServletRequest servletRequest,
             @RequestParam(defaultValue = "") String keyword,
             @RequestParam(defaultValue = "") String status,
             @RequestParam(defaultValue = "") String category,
@@ -40,12 +41,14 @@ public class ItemController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "8") int size
     ) {
-        return ApiResponse.ok(itemService.publicList(keyword, status, category, type, location, page, size));
+        Long userId = (Long) servletRequest.getAttribute("loginUserId");
+        return ApiResponse.ok(itemService.publicList(keyword, status, category, type, location, page, size, userId));
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<LostItem> detail(@PathVariable Long id) {
-        return ApiResponse.ok(itemService.getById(id));
+    public ApiResponse<LostItem> detail(@PathVariable Long id, HttpServletRequest servletRequest) {
+        Long userId = (Long) servletRequest.getAttribute("loginUserId");
+        return ApiResponse.ok(itemService.getById(id, userId));
     }
 
     @GetMapping("/my")

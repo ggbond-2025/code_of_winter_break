@@ -20,6 +20,9 @@ public class SystemConfig {
     private Integer publishCooldownMinutes = 5;
 
     @Column(nullable = false)
+    private Integer maxChatPerUser = 50;
+
+    @Column(nullable = false)
     private boolean forbidWordCheck = true;
 
     @Column(nullable = false, length = 2000)
@@ -53,6 +56,8 @@ public class SystemConfig {
     public void setClaimExpireDays(Integer claimExpireDays) { this.claimExpireDays = claimExpireDays; }
     public Integer getPublishCooldownMinutes() { return publishCooldownMinutes; }
     public void setPublishCooldownMinutes(Integer publishCooldownMinutes) { this.publishCooldownMinutes = publishCooldownMinutes; }
+    public Integer getMaxChatPerUser() { return maxChatPerUser; }
+    public void setMaxChatPerUser(Integer maxChatPerUser) { this.maxChatPerUser = maxChatPerUser; }
     public boolean isForbidWordCheck() { return forbidWordCheck; }
     public void setForbidWordCheck(boolean forbidWordCheck) { this.forbidWordCheck = forbidWordCheck; }
     public String getForbiddenWords() { return forbiddenWords; }

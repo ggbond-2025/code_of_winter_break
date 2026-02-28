@@ -271,6 +271,13 @@ public class ClaimServiceImpl implements ClaimService {
         if (!isClaimParticipant(claim, userId) || !isClaimParticipant(claim, peerId)) {
             throw new IllegalArgumentException("无权发送消息");
         }
+        Integer maxChatPerUser = systemConfigService.getConfig().getMaxChatPerUser();
+        if (maxChatPerUser != null && maxChatPerUser > 0) {
+            long sentCount = chatMessageRepository.countByClaimIdAndSenderId(claimId, userId);
+            if (sentCount >= maxChatPerUser) {
+                throw new IllegalArgumentException("已达到单帖聊天发送上限（" + maxChatPerUser + "条）");
+            }
+        }
         User sender = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("用户不存在"));
         User receiver = userRepository.findById(peerId)

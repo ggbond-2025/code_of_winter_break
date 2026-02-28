@@ -20,12 +20,17 @@ public class SystemConfigServiceImpl implements SystemConfigService {
 
     @Override
     public SystemConfig getConfig() {
-        return systemConfigRepository.findById(1L).orElseGet(() -> {
-            SystemConfig cfg = new SystemConfig();
-            cfg.setCategories("证件,电子产品,生活用品,文体,书籍,其他");
-            cfg.setForbiddenWords("广告,代购,赌博,色情,诈骗");
-            return systemConfigRepository.save(cfg);
+        SystemConfig cfg = systemConfigRepository.findById(1L).orElseGet(() -> {
+            SystemConfig createdCfg = new SystemConfig();
+            createdCfg.setCategories("证件,电子产品,生活用品,文体,书籍,其他");
+            createdCfg.setForbiddenWords("广告,代购,赌博,色情,诈骗");
+            return systemConfigRepository.save(createdCfg);
         });
+        if (cfg.getMaxChatPerUser() == null || cfg.getMaxChatPerUser() <= 0) {
+            cfg.setMaxChatPerUser(50);
+            cfg = systemConfigRepository.save(cfg);
+        }
+        return cfg;
     }
 
     @Override
@@ -34,6 +39,7 @@ public class SystemConfigServiceImpl implements SystemConfigService {
         if (update.getCategories() != null) cfg.setCategories(normalizeCategories(update.getCategories()));
         if (update.getClaimExpireDays() != null && update.getClaimExpireDays() > 0) cfg.setClaimExpireDays(update.getClaimExpireDays());
         if (update.getPublishCooldownMinutes() != null && update.getPublishCooldownMinutes() >= 0) cfg.setPublishCooldownMinutes(update.getPublishCooldownMinutes());
+        if (update.getMaxChatPerUser() != null && update.getMaxChatPerUser() > 0) cfg.setMaxChatPerUser(update.getMaxChatPerUser());
         cfg.setForbidWordCheck(update.isForbidWordCheck());
         if (update.getForbiddenWords() != null) cfg.setForbiddenWords(normalizeForbiddenWords(update.getForbiddenWords()));
         cfg.setRequireImage(update.isRequireImage());

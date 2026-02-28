@@ -3,6 +3,7 @@ package com.campus.lostfound.service.impl;
 import com.campus.lostfound.model.LostItem;
 import com.campus.lostfound.model.SystemConfig;
 import com.campus.lostfound.model.User;
+import com.campus.lostfound.repository.ClaimRecordRepository;
 import com.campus.lostfound.repository.LostItemRepository;
 import com.campus.lostfound.repository.UserRepository;
 import com.campus.lostfound.service.ItemService;
@@ -11,6 +12,7 @@ import com.campus.lostfound.service.SystemNotificationService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -18,15 +20,18 @@ import java.util.List;
 public class ItemServiceImpl implements ItemService {
 
     private final LostItemRepository lostItemRepository;
+    private final ClaimRecordRepository claimRecordRepository;
     private final UserRepository userRepository;
     private final SystemConfigService systemConfigService;
     private final SystemNotificationService systemNotificationService;
 
     public ItemServiceImpl(LostItemRepository lostItemRepository,
+                           ClaimRecordRepository claimRecordRepository,
                            UserRepository userRepository,
                            SystemConfigService systemConfigService,
                            SystemNotificationService systemNotificationService) {
         this.lostItemRepository = lostItemRepository;
+        this.claimRecordRepository = claimRecordRepository;
         this.userRepository = userRepository;
         this.systemConfigService = systemConfigService;
         this.systemNotificationService = systemNotificationService;
@@ -49,6 +54,23 @@ public class ItemServiceImpl implements ItemService {
                 }
             }
         }
+		if(title.isEmpty()) throw new IllegalArgumentException("请填写物品名称");
+		if(location.isEmpty()) throw new IllegalArgumentException("请填写物品地点");
+		if(lostTime.isEmpty()){
+			if (type.equals("LOST")) {
+				throw new IllegalArgumentException("请填写物品丢失时间");
+			}
+			if (type.equals("FOUND")){
+				throw new IllegalArgumentException("请填写物品拾取时间");
+			}
+		} 
+		if(type.equals("FOUND") && storageLocation.isEmpty()) throw new IllegalArgumentException("请填写物品领取地点");
+		if(description.isEmpty()) throw new IllegalArgumentException("请填写物品介绍");
+		if(category.isEmpty()) throw new IllegalArgumentException("请选择物品类别");
+		if(contactName.isEmpty()) throw new IllegalArgumentException("请填写联系人姓名");
+		if(contactPhone.isEmpty()) throw new IllegalArgumentException("请填写联系人手机号码");
+		if(type.equals("LOST") && reward != null && reward < 0) throw new IllegalArgumentException("请填写正确的悬赏金额");
+		
         if (cfg.isRequireImage()) {
             String imgs = imageUrls == null ? "" : imageUrls.trim();
             if (imgs.isEmpty()) throw new IllegalArgumentException("请上传图片");
@@ -87,7 +109,7 @@ public class ItemServiceImpl implements ItemService {
         item.setContactPhone(contactPhone);
         item.setFeatures(features);
         item.setImageUrls(imageUrls);
-        item.setReward(reward);
+        item.setReward(reward != null ? reward : 0.0);
         item.setStorageLocation(storageLocation);
         item.setCreator(user);
 
@@ -101,25 +123,30 @@ public class ItemServiceImpl implements ItemService {
     }
 
     @Override
-    public Page<LostItem> publicList(String keyword, String status, String category, String type, String location, int page, int size) {
+    @Transactional(readOnly = true)
+    public Page<LostItem> publicList(String keyword, String status, String category, String type, String location, int page, int size, Long viewerId) {
         String effectiveLocation = location == null ? "" : location;
         String kw = keyword == null ? "" : keyword;
         String cat = category == null ? "" : category;
         String tp = type == null ? "" : type;
         List<String> publicStatuses = List.of("CLAIM_ADMIN_REVIEW", "CLAIM_OWNER_REVIEW", "APPROVED", "MATCHED");
         if (status == null || status.isEmpty()) {
-            return lostItemRepository.searchByStatuses(kw, publicStatuses, cat, tp, effectiveLocation, PageRequest.of(page, size));
+            return lostItemRepository.searchByStatuses(kw, publicStatuses, cat, tp, effectiveLocation, PageRequest.of(page, size))
+                    .map(item -> maskStorageLocationForViewer(item, viewerId));
         }
         if (!publicStatuses.contains(status)) {
             return Page.empty(PageRequest.of(page, size));
         }
-        return lostItemRepository.search(kw, status, cat, tp, effectiveLocation, PageRequest.of(page, size));
+        return lostItemRepository.search(kw, status, cat, tp, effectiveLocation, PageRequest.of(page, size))
+                .map(item -> maskStorageLocationForViewer(item, viewerId));
     }
 
     @Override
-    public LostItem getById(Long id) {
-        return lostItemRepository.findById(id)
+    @Transactional(readOnly = true)
+    public LostItem getById(Long id, Long viewerId) {
+        LostItem item = lostItemRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("物品不存在"));
+        return maskStorageLocationForViewer(item, viewerId);
     }
 
     @Override
@@ -271,5 +298,21 @@ public class ItemServiceImpl implements ItemService {
 
     private String safeText(String text) {
         return text == null || text.isBlank() ? "无" : text;
+    }
+
+    private LostItem maskStorageLocationForViewer(LostItem item, Long viewerId) {
+        if (item == null) return null;
+        if (!"FOUND".equals(item.getType())) return item;
+        String storage = item.getStorageLocation();
+        if (storage == null || storage.isBlank()) return item;
+        if (canViewStorageLocation(item, viewerId)) return item;
+        item.setStorageLocation(null);
+        return item;
+    }
+
+    private boolean canViewStorageLocation(LostItem item, Long viewerId) {
+        if (item == null || item.getId() == null || viewerId == null) return false;
+        if (item.getCreator() != null && viewerId.equals(item.getCreator().getId())) return true;
+        return claimRecordRepository.existsByItemIdAndClaimerIdAndStatus(item.getId(), viewerId, "APPROVED");
     }
 }

@@ -17,7 +17,8 @@ const Router = {
     const app = document.getElementById('app');
     const renderFn = this.routes[name];
     if (renderFn) {
-      app.innerHTML = '';
+      // Do not clear app.innerHTML here, let renderFn or renderLayout handle it
+      // to allow smooth transitions and layout reuse
       renderFn(app, params);
     }
     let hash = name;

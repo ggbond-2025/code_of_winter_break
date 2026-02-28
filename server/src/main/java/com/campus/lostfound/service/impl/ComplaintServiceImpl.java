@@ -15,6 +15,7 @@ import com.campus.lostfound.service.SystemNotificationService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
@@ -71,7 +72,8 @@ public class ComplaintServiceImpl implements ComplaintService {
 
         if ("ITEM_POST".equals(type)) {
             if (itemId == null) throw new IllegalArgumentException("帖子ID不能为空");
-            if (complaintRecordRepository.existsByReporterIdAndComplaintTypeAndItemId(reporterId, type, itemId)) {
+            ComplaintRecord latest = complaintRecordRepository.findTopByReporterIdAndComplaintTypeAndItemIdOrderByCreatedAtDesc(reporterId, type, itemId);
+            if (latest != null && !"REJECTED".equals(latest.getStatus())) {
                 throw new IllegalArgumentException("你已举报过该帖子，请勿重复举报");
             }
             item = lostItemRepository.findById(itemId)
@@ -83,7 +85,8 @@ public class ComplaintServiceImpl implements ComplaintService {
             }
         } else if ("CLAIM_APPLICATION".equals(type)) {
             if (claimId == null) throw new IllegalArgumentException("申请ID不能为空");
-            if (complaintRecordRepository.existsByReporterIdAndComplaintTypeAndClaimId(reporterId, type, claimId)) {
+            ComplaintRecord latest = complaintRecordRepository.findTopByReporterIdAndComplaintTypeAndClaimIdOrderByCreatedAtDesc(reporterId, type, claimId);
+            if (latest != null && !"REJECTED".equals(latest.getStatus())) {
                 throw new IllegalArgumentException("你已举报过该申请，请勿重复举报");
             }
             claim = claimRecordRepository.findById(claimId)
@@ -102,7 +105,8 @@ public class ComplaintServiceImpl implements ComplaintService {
             }
         } else {
             if (messageId == null) throw new IllegalArgumentException("聊天消息ID不能为空");
-            if (complaintRecordRepository.existsByReporterIdAndComplaintTypeAndChatMessageId(reporterId, type, messageId)) {
+            ComplaintRecord latest = complaintRecordRepository.findTopByReporterIdAndComplaintTypeAndChatMessageIdOrderByCreatedAtDesc(reporterId, type, messageId);
+            if (latest != null && !"REJECTED".equals(latest.getStatus())) {
                 throw new IllegalArgumentException("你已举报过该聊天消息，请勿重复举报");
             }
             chatMessage = chatMessageRepository.findById(messageId)
@@ -156,6 +160,7 @@ public class ComplaintServiceImpl implements ComplaintService {
     }
 
     @Override
+    @Transactional
     public ComplaintRecord resolve(Long handlerId, Long complaintId, String action) {
         ComplaintRecord record = complaintRecordRepository.findById(complaintId)
                 .orElseThrow(() -> new IllegalArgumentException("投诉记录不存在"));
@@ -170,6 +175,10 @@ public class ComplaintServiceImpl implements ComplaintService {
             if ("ITEM_POST".equals(record.getComplaintType())) {
                 LostItem complaintItem = record.getItem();
                 if (complaintItem != null) {
+                    record.setItem(null);
+                    record.setClaim(null);
+                    record.setChatMessage(null);
+                    complaintRecordRepository.save(record);
                     sendComplaintNotice(complaintItem.getCreator() != null ? complaintItem.getCreator().getId() : null,
                             postNoticeObject(complaintItem),
                             "删除帖子",
@@ -180,18 +189,13 @@ public class ComplaintServiceImpl implements ComplaintService {
             } else if ("CLAIM_APPLICATION".equals(record.getComplaintType())) {
                 ClaimRecord complaintClaim = record.getClaim();
                 if (complaintClaim != null) {
-                    String oldStatus = complaintClaim.getStatus();
-                    complaintClaim.setStatus("REJECTED");
-                    complaintClaim.setRejectReason("被他人举报");
-                    claimRecordRepository.save(complaintClaim);
-                    if (!"REJECTED".equals(oldStatus)) {
-                        sendComplaintNotice(complaintClaim.getClaimer() != null ? complaintClaim.getClaimer().getId() : null,
-                                claimNoticeObject(complaintClaim.getItem()),
-                                "状态变更",
-                                statusText("REJECTED"),
-                                String.format("状态由 %s 变更为 %s；被他人举报", statusText(oldStatus), statusText("REJECTED")));
-                    }
-                    refreshItemStatusByClaims(complaintClaim.getItem());
+                    sendComplaintNotice(complaintClaim.getClaimer() != null ? complaintClaim.getClaimer().getId() : null,
+                            claimNoticeObject(complaintClaim.getItem()),
+                            "删除申请",
+                            "已删除",
+                            "内容违规，被举报，申请已删除");
+                    removeClaimApplicationWithRefsCleaned(complaintClaim);
+                    record.setClaim(null);
                 }
             } else if ("CHAT_MESSAGE".equals(record.getComplaintType())) {
                 Long messageId = record.getChatMessage() != null ? record.getChatMessage().getId() : null;
@@ -207,6 +211,10 @@ public class ComplaintServiceImpl implements ComplaintService {
             if ("ITEM_POST".equals(record.getComplaintType())) {
                 LostItem complaintItem = record.getItem();
                 if (complaintItem != null) {
+                    record.setItem(null);
+                    record.setClaim(null);
+                    record.setChatMessage(null);
+                    complaintRecordRepository.save(record);
                     sendComplaintNotice(complaintItem.getCreator() != null ? complaintItem.getCreator().getId() : null,
                             postNoticeObject(complaintItem),
                             "删除帖子",
@@ -217,18 +225,13 @@ public class ComplaintServiceImpl implements ComplaintService {
             } else if ("CLAIM_APPLICATION".equals(record.getComplaintType())) {
                 ClaimRecord complaintClaim = record.getClaim();
                 if (complaintClaim != null) {
-                    String oldStatus = complaintClaim.getStatus();
-                    complaintClaim.setStatus("REJECTED");
-                    complaintClaim.setRejectReason("被他人举报");
-                    claimRecordRepository.save(complaintClaim);
-                    if (!"REJECTED".equals(oldStatus)) {
-                        sendComplaintNotice(complaintClaim.getClaimer() != null ? complaintClaim.getClaimer().getId() : null,
-                                claimNoticeObject(complaintClaim.getItem()),
-                                "状态变更",
-                                statusText("REJECTED"),
-                                String.format("状态由 %s 变更为 %s；被他人举报", statusText(oldStatus), statusText("REJECTED")));
-                    }
-                    refreshItemStatusByClaims(complaintClaim.getItem());
+                    sendComplaintNotice(complaintClaim.getClaimer() != null ? complaintClaim.getClaimer().getId() : null,
+                            claimNoticeObject(complaintClaim.getItem()),
+                            "删除申请",
+                            "已删除",
+                            "内容违规，被举报，申请已删除");
+                    removeClaimApplicationWithRefsCleaned(complaintClaim);
+                    record.setClaim(null);
                 }
             } else if ("CHAT_MESSAGE".equals(record.getComplaintType())) {
                 Long messageId = record.getChatMessage() != null ? record.getChatMessage().getId() : null;
@@ -274,7 +277,19 @@ public class ComplaintServiceImpl implements ComplaintService {
             claimRecordRepository.deleteByItemId(item.getId());
         }
         complaintRecordRepository.clearItemReferenceByItemId(item.getId());
+        complaintRecordRepository.flush();
         lostItemRepository.delete(item);
+    }
+
+    private void removeClaimApplicationWithRefsCleaned(ClaimRecord claim) {
+        if (claim == null || claim.getId() == null) return;
+        Long claimId = claim.getId();
+        java.util.List<Long> claimIds = java.util.List.of(claimId);
+        complaintRecordRepository.clearChatMessageReferenceByClaimIds(claimIds);
+        chatMessageRepository.deleteByClaimIdIn(claimIds);
+        complaintRecordRepository.clearClaimReferenceByClaimIds(claimIds);
+        claimRecordRepository.deleteById(claimId);
+        refreshItemStatusByClaims(claim.getItem());
     }
 
     private boolean isClaimParticipant(ClaimRecord claim, Long userId) {
